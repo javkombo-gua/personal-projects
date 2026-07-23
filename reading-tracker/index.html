@@ -95,8 +95,30 @@
   .panel { display: none; }
   .panel.active { display: block; }
 
-  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+  .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
   @media (max-width: 800px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } }
+
+  .range-group { display: flex; flex-direction: column; gap: 4px; min-width: 170px; flex: 1; }
+  .range-group label { font-size: 12px; color: var(--text-secondary); font-weight: 600; display: flex; justify-content: space-between; gap: 8px; }
+  .range-group .range-value { color: var(--text-primary); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .range-slider { position: relative; height: 20px; }
+  .range-track { position: absolute; top: 50%; left: 0; right: 0; height: 4px; background: var(--gridline); border-radius: 2px; transform: translateY(-50%); }
+  .range-fill { position: absolute; top: 50%; height: 4px; background: var(--series-1); border-radius: 2px; transform: translateY(-50%); }
+  .range-slider input[type=range] {
+    position: absolute; top: 0; left: 0; width: 100%; height: 20px; margin: 0;
+    background: transparent; -webkit-appearance: none; appearance: none; pointer-events: none;
+  }
+  .range-slider input[type=range]::-webkit-slider-runnable-track { background: transparent; }
+  .range-slider input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none; pointer-events: auto;
+    width: 16px; height: 16px; border-radius: 50%; background: var(--series-1);
+    border: 2px solid var(--surface-1); box-shadow: 0 1px 3px rgba(0,0,0,0.3); cursor: pointer; margin-top: 0;
+  }
+  .range-slider input[type=range]::-moz-range-track { background: transparent; border: none; }
+  .range-slider input[type=range]::-moz-range-thumb {
+    pointer-events: auto; width: 14px; height: 14px; border-radius: 50%; background: var(--series-1);
+    border: 2px solid var(--surface-1); box-shadow: 0 1px 3px rgba(0,0,0,0.3); cursor: pointer;
+  }
   .stat-tile {
     background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px;
     padding: 14px 16px; box-shadow: var(--card-shadow);
@@ -415,29 +437,70 @@ function escapeHtml(s) {
 }
 
 /* ================= DASHBOARD ================= */
-let dashFilter = { yearMin: '', yearMax: '', genre: '', author: '', minRating: '' };
+let dashFilter = { yearMin: null, yearMax: null, genre: '', author: '', ratingMin: 0, ratingMax: 10 };
 
-function dashHasActiveFilters() {
-  return !!(dashFilter.yearMin || dashFilter.yearMax || dashFilter.genre || dashFilter.author || dashFilter.minRating);
+function dashHasActiveFilters(overallMinYear, overallMaxYear) {
+  return !(dashFilter.yearMin === overallMinYear && dashFilter.yearMax === overallMaxYear) ||
+         !!dashFilter.genre || !!dashFilter.author ||
+         !(dashFilter.ratingMin === 0 && dashFilter.ratingMax === 10);
 }
-function dashApplyFilters(books, ignoreYear) {
+function dashApplyFilters(books, overallMinYear, overallMaxYear, ignoreYear) {
+  const yearActive = !ignoreYear && !(dashFilter.yearMin === overallMinYear && dashFilter.yearMax === overallMaxYear);
+  const ratingActive = !(dashFilter.ratingMin === 0 && dashFilter.ratingMax === 10);
   return books.filter(b => {
-    if (!ignoreYear) {
-      if (dashFilter.yearMin !== '' && (!b.yearRead || b.yearRead < Number(dashFilter.yearMin))) return false;
-      if (dashFilter.yearMax !== '' && (!b.yearRead || b.yearRead > Number(dashFilter.yearMax))) return false;
-    }
+    if (yearActive && (!b.yearRead || b.yearRead < dashFilter.yearMin || b.yearRead > dashFilter.yearMax)) return false;
     if (dashFilter.genre && b.genre !== dashFilter.genre) return false;
     if (dashFilter.author && b.author !== dashFilter.author) return false;
-    if (dashFilter.minRating !== '' && (b.rating == null || b.rating < Number(dashFilter.minRating))) return false;
+    if (ratingActive && (b.rating == null || b.rating < dashFilter.ratingMin || b.rating > dashFilter.ratingMax)) return false;
     return true;
   });
+}
+
+function initDualRangeSlider(lowId, highId, fillId, labelId, opts) {
+  const lowEl = document.getElementById(lowId);
+  const highEl = document.getElementById(highId);
+  const fillEl = document.getElementById(fillId);
+  const labelEl = document.getElementById(labelId);
+  const span = (opts.max - opts.min) || 1;
+
+  function paint() {
+    let lo = Number(lowEl.value), hi = Number(highEl.value);
+    if (lo > hi) { lo = hi; lowEl.value = lo; }
+    const pctLo = (lo - opts.min) / span * 100;
+    const pctHi = (hi - opts.min) / span * 100;
+    fillEl.style.left = pctLo + '%';
+    fillEl.style.width = Math.max(0, pctHi - pctLo) + '%';
+    labelEl.textContent = opts.formatLabel(lo, hi);
+    return { lo, hi };
+  }
+
+  lowEl.addEventListener('input', () => {
+    if (Number(lowEl.value) > Number(highEl.value)) lowEl.value = highEl.value;
+    paint();
+  });
+  highEl.addEventListener('input', () => {
+    if (Number(highEl.value) < Number(lowEl.value)) highEl.value = lowEl.value;
+    paint();
+  });
+  lowEl.addEventListener('change', () => { const { lo, hi } = paint(); opts.onCommit(lo, hi); });
+  highEl.addEventListener('change', () => { const { lo, hi } = paint(); opts.onCommit(lo, hi); });
+
+  paint();
 }
 
 function renderDashboard() {
   const panel = document.getElementById('panel-dashboard');
   const allFin = finishedBooks();
-  const fin = dashApplyFilters(allFin, false);
-  const paceBooks = dashApplyFilters(allFin, true);
+  const allYears = Array.from(new Set(allFin.map(b => b.yearRead).filter(Boolean))).sort((a,b)=>a-b);
+  const allGenres = Array.from(new Set(allFin.map(b => b.genre).filter(Boolean))).sort();
+  const allAuthors = Array.from(new Set(allFin.map(b => b.author).filter(Boolean))).sort();
+  const overallMinYear = allYears.length ? allYears[0] : new Date().getFullYear();
+  const overallMaxYear = allYears.length ? allYears[allYears.length-1] : new Date().getFullYear();
+  if (dashFilter.yearMin == null) dashFilter.yearMin = overallMinYear;
+  if (dashFilter.yearMax == null) dashFilter.yearMax = overallMaxYear;
+
+  const fin = dashApplyFilters(allFin, overallMinYear, overallMaxYear, false);
+  const paceBooks = dashApplyFilters(allFin, overallMinYear, overallMaxYear, true);
   const totalBooks = fin.length;
   const totalPages = fin.reduce((s,b) => s + (b.pages||0), 0);
   const totalHours = fin.reduce((s,b) => s + (b.hoursToRead||0), 0);
@@ -475,11 +538,6 @@ function renderDashboard() {
   const maxYearCount = Math.max(1, ...years.map(y => byYear[y]));
   const maxMonthCount = Math.max(1, ...byMonth);
 
-  // Filter option universes (unfiltered, so the dropdowns never shrink)
-  const allYears = Array.from(new Set(allFin.map(b => b.yearRead).filter(Boolean))).sort((a,b)=>a-b);
-  const allGenres = Array.from(new Set(allFin.map(b => b.genre).filter(Boolean))).sort();
-  const allAuthors = Array.from(new Set(allFin.map(b => b.author).filter(Boolean))).sort();
-
   // Extreme callouts
   const withPages = fin.filter(b => b.pages != null && b.pages > 0);
   const longest = withPages.length ? withPages.reduce((a,b) => b.pages > a.pages ? b : a) : null;
@@ -487,6 +545,8 @@ function renderDashboard() {
   const withHours = fin.filter(b => b.hoursToRead != null && b.hoursToRead > 0);
   const quickest = withHours.length ? withHours.reduce((a,b) => b.hoursToRead < a.hoursToRead ? b : a) : null;
   const slowest = withHours.length ? withHours.reduce((a,b) => b.hoursToRead > a.hoursToRead ? b : a) : null;
+  const withRatingBooks = fin.filter(b => b.rating != null);
+  const highestRated = withRatingBooks.length ? withRatingBooks.reduce((a,b) => b.rating > a.rating ? b : a) : null;
 
   // Avg rating by genre
   const genreRatings = {};
@@ -529,25 +589,37 @@ function renderDashboard() {
   const pulReadCount = pulAwarded.filter(p => findMatchingBook(p)).length;
   const pulPct = pulAwarded.length ? Math.round(pulReadCount / pulAwarded.length * 100) : 0;
 
+  const hasActiveFilters = dashHasActiveFilters(overallMinYear, overallMaxYear);
   panel.innerHTML = `
-    <div class="toolbar">
-      <select id="dashYearMin"><option value="">Year from</option>${allYears.map(y => `<option value="${y}" ${dashFilter.yearMin===String(y)?'selected':''}>${y}</option>`).join('')}</select>
-      <select id="dashYearMax"><option value="">Year to</option>${allYears.map(y => `<option value="${y}" ${dashFilter.yearMax===String(y)?'selected':''}>${y}</option>`).join('')}</select>
+    <div class="toolbar" style="align-items:flex-end;">
+      <div class="range-group">
+        <label>Year range <span class="range-value" id="dashYearLabel"></span></label>
+        <div class="range-slider">
+          <div class="range-track"></div>
+          <div class="range-fill" id="dashYearFill"></div>
+          <input type="range" id="dashYearLow" min="${overallMinYear}" max="${overallMaxYear}" step="1" value="${dashFilter.yearMin}">
+          <input type="range" id="dashYearHigh" min="${overallMinYear}" max="${overallMaxYear}" step="1" value="${dashFilter.yearMax}">
+        </div>
+      </div>
       <select id="dashGenre"><option value="">All genres</option>${allGenres.map(g => `<option value="${escapeHtml(g)}" ${dashFilter.genre===g?'selected':''}>${escapeHtml(g)}</option>`).join('')}</select>
       <select id="dashAuthor"><option value="">All authors</option>${allAuthors.map(a => `<option value="${escapeHtml(a)}" ${dashFilter.author===a?'selected':''}>${escapeHtml(a)}</option>`).join('')}</select>
-      <select id="dashMinRating">
-        <option value="">Any rating</option>
-        ${[6,7,8,9,10].map(n => `<option value="${n}" ${dashFilter.minRating===String(n)?'selected':''}>${n}${n<10?'+':' only'}</option>`).join('')}
-      </select>
-      ${dashHasActiveFilters() ? '<button class="btn" id="dashClearFilters">Clear filters</button>' : ''}
+      <div class="range-group">
+        <label>Rating range <span class="range-value" id="dashRatingLabel"></span></label>
+        <div class="range-slider">
+          <div class="range-track"></div>
+          <div class="range-fill" id="dashRatingFill"></div>
+          <input type="range" id="dashRatingLow" min="0" max="10" step="0.5" value="${dashFilter.ratingMin}">
+          <input type="range" id="dashRatingHigh" min="0" max="10" step="0.5" value="${dashFilter.ratingMax}">
+        </div>
+      </div>
+      ${hasActiveFilters ? '<button class="btn" id="dashClearFilters">Clear filters</button>' : ''}
     </div>
     <div class="stat-grid">
       <div class="stat-tile"><div class="value">${fmtNum(totalBooks)}</div><div class="label">Books finished</div></div>
       <div class="stat-tile"><div class="value">${fmtNum(totalPages)}</div><div class="label">Pages read</div></div>
       <div class="stat-tile"><div class="value">${fmtNum(Math.round(totalHours))}</div><div class="label">Hours read</div></div>
       <div class="stat-tile"><div class="value">${avgRating != null ? avgRating.toFixed(1) : '—'}</div><div class="label">Avg rating (out of 10)</div></div>
-    </div>
-    <div class="stat-grid">
+      <div class="stat-tile"><div class="value">${highestRated ? highestRated.rating : '—'}</div><div class="label">Highest rated${highestRated ? ' · ' + escapeHtml(highestRated.title) : ''}</div></div>
       <div class="stat-tile"><div class="value">${longest ? fmtNum(longest.pages) : '—'}</div><div class="label">Longest book${longest ? ' · ' + escapeHtml(longest.title) : ''}</div></div>
       <div class="stat-tile"><div class="value">${shortest ? fmtNum(shortest.pages) : '—'}</div><div class="label">Shortest book${shortest ? ' · ' + escapeHtml(shortest.title) : ''}</div></div>
       <div class="stat-tile"><div class="value">${quickest ? quickest.hoursToRead.toFixed(1) + ' hrs' : '—'}</div><div class="label">Quickest read${quickest ? ' · ' + escapeHtml(quickest.title) : ''}</div></div>
@@ -679,13 +751,20 @@ function renderDashboard() {
     </div>
   `;
 
-  document.getElementById('dashYearMin').addEventListener('change', e => { dashFilter.yearMin = e.target.value; renderDashboard(); });
-  document.getElementById('dashYearMax').addEventListener('change', e => { dashFilter.yearMax = e.target.value; renderDashboard(); });
   document.getElementById('dashGenre').addEventListener('change', e => { dashFilter.genre = e.target.value; renderDashboard(); });
   document.getElementById('dashAuthor').addEventListener('change', e => { dashFilter.author = e.target.value; renderDashboard(); });
-  document.getElementById('dashMinRating').addEventListener('change', e => { dashFilter.minRating = e.target.value; renderDashboard(); });
+  initDualRangeSlider('dashYearLow', 'dashYearHigh', 'dashYearFill', 'dashYearLabel', {
+    min: overallMinYear, max: overallMaxYear,
+    formatLabel: (lo, hi) => lo === hi ? String(lo) : `${lo}–${hi}`,
+    onCommit: (lo, hi) => { dashFilter.yearMin = lo; dashFilter.yearMax = hi; renderDashboard(); }
+  });
+  initDualRangeSlider('dashRatingLow', 'dashRatingHigh', 'dashRatingFill', 'dashRatingLabel', {
+    min: 0, max: 10,
+    formatLabel: (lo, hi) => `${lo.toFixed(1)}–${hi.toFixed(1)}`,
+    onCommit: (lo, hi) => { dashFilter.ratingMin = lo; dashFilter.ratingMax = hi; renderDashboard(); }
+  });
   const dashClearBtn = document.getElementById('dashClearFilters');
-  if (dashClearBtn) dashClearBtn.addEventListener('click', () => { dashFilter = { yearMin: '', yearMax: '', genre: '', author: '', minRating: '' }; renderDashboard(); });
+  if (dashClearBtn) dashClearBtn.addEventListener('click', () => { dashFilter = { yearMin: null, yearMax: null, genre: '', author: '', ratingMin: 0, ratingMax: 10 }; renderDashboard(); });
   document.getElementById('dashPulitzerLink').addEventListener('click', () => document.querySelector('nav.tabs button[data-tab="pulitzer"]').click());
 
   const sel = document.getElementById('monthYearSelect');
