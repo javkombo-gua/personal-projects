@@ -1,0 +1,922 @@
+<title>Reading Tracker</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;
+    --page-plane:     #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --gridline:       #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --series-1:       #2a78d6; /* blue */
+    --series-1-100:   #cde2fb;
+    --series-1-300:   #6da7ec;
+    --good:           #0ca30c;
+    --card-shadow:    0 1px 2px rgba(11,11,11,0.06), 0 1px 8px rgba(11,11,11,0.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface-1:      #1a1a19;
+      --page-plane:     #0d0d0d;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --gridline:       #2c2c2a;
+      --baseline:       #383835;
+      --border:         rgba(255,255,255,0.10);
+      --series-1:       #3987e5;
+      --series-1-100:   #184f95;
+      --series-1-300:   #256abf;
+      --good:           #0ca30c;
+      --card-shadow:    0 1px 2px rgba(0,0,0,0.3), 0 1px 8px rgba(0,0,0,0.2);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-1:      #1a1a19;
+    --page-plane:     #0d0d0d;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --gridline:       #2c2c2a;
+    --baseline:       #383835;
+    --border:         rgba(255,255,255,0.10);
+    --series-1:       #3987e5;
+    --series-1-100:   #184f95;
+    --series-1-300:   #256abf;
+    --good:           #0ca30c;
+    --card-shadow:    0 1px 2px rgba(0,0,0,0.3), 0 1px 8px rgba(0,0,0,0.2);
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--page-plane);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  body { min-height: 100vh; }
+  .app { max-width: 1180px; margin: 0 auto; padding: 24px 20px 80px; }
+
+  header.top {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 20px; gap: 12px; flex-wrap: wrap;
+  }
+  header.top h1 { font-size: 22px; margin: 0; font-weight: 700; }
+  header.top .sub { color: var(--text-secondary); font-size: 13px; margin-top: 2px; }
+
+  .icon-btn, .btn {
+    font-family: inherit; font-size: 13px; font-weight: 600;
+    border-radius: 8px; border: 1px solid var(--border);
+    background: var(--surface-1); color: var(--text-primary);
+    padding: 8px 14px; cursor: pointer;
+  }
+  .btn.primary { background: var(--series-1); border-color: var(--series-1); color: #fff; }
+  .btn:hover, .icon-btn:hover { filter: brightness(0.97); }
+  .btn:active { transform: translateY(1px); }
+  .header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  nav.tabs {
+    display: flex; gap: 4px; border-bottom: 1px solid var(--gridline);
+    margin-bottom: 20px; overflow-x: auto;
+  }
+  nav.tabs button {
+    font-family: inherit; background: none; border: none; cursor: pointer;
+    padding: 10px 16px; font-size: 14px; font-weight: 600; color: var(--text-secondary);
+    border-bottom: 2px solid transparent; white-space: nowrap;
+  }
+  nav.tabs button.active { color: var(--text-primary); border-bottom-color: var(--series-1); }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+  @media (max-width: 800px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } }
+  .stat-tile {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px 16px; box-shadow: var(--card-shadow);
+  }
+  .stat-tile .value { font-size: 26px; font-weight: 700; font-variant-numeric: proportional-nums; }
+  .stat-tile .label { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
+  .card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 900px) { .card-grid { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px; box-shadow: var(--card-shadow); margin-bottom: 14px;
+  }
+  .card h3 { margin: 0 0 2px; font-size: 14px; font-weight: 700; }
+  .card .card-sub { font-size: 12px; color: var(--text-muted); margin-bottom: 12px; }
+  .card select { font-family: inherit; font-size: 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-1); color: var(--text-primary); padding: 3px 6px; }
+  .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+
+  .bars { display: flex; flex-direction: column; gap: 7px; }
+  .bar-row { display: grid; grid-template-columns: 84px 1fr 40px; align-items: center; gap: 8px; font-size: 12px; }
+  .bar-row .bar-label { color: var(--text-secondary); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar-row .bar-track { background: var(--gridline); border-radius: 4px; height: 14px; position: relative; overflow: hidden; }
+  .bar-row .bar-fill { background: var(--series-1); height: 100%; border-radius: 4px; min-width: 3px; transition: width .3s; }
+  .bar-row .bar-val { color: var(--text-primary); font-variant-numeric: tabular-nums; font-weight: 600; }
+
+  .vbars { display: flex; align-items: flex-end; gap: 6px; height: 140px; padding-top: 10px; }
+  .vbar-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 4px; min-width: 0; }
+  .vbar-col .vbar { width: 100%; max-width: 28px; background: var(--series-1); border-radius: 4px 4px 2px 2px; min-height: 2px; transition: height .3s; }
+  .vbar-col .vbar-count { font-size: 10px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .vbar-col .vbar-label { font-size: 10px; color: var(--text-secondary); margin-top: 2px; }
+  .vbar-col:hover .vbar { filter: brightness(1.15); }
+  .vbar-col[title] { cursor: default; }
+
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; align-items: center; }
+  .toolbar input[type=text] {
+    font-family: inherit; font-size: 13px; padding: 8px 10px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--surface-1); color: var(--text-primary); min-width: 200px; flex: 1;
+  }
+  .toolbar select {
+    font-family: inherit; font-size: 13px; padding: 8px 10px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--surface-1); color: var(--text-primary);
+  }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .03em;
+    color: var(--text-muted); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--gridline);
+    cursor: pointer; white-space: nowrap; position: sticky; top: 0; background: var(--page-plane);
+  }
+  thead th:hover { color: var(--text-primary); }
+  tbody td { padding: 8px 10px; border-bottom: 1px solid var(--gridline); vertical-align: top; }
+  tbody tr:hover { background: rgba(127,127,127,0.06); }
+  .table-wrap { overflow-x: auto; background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; }
+  .table-wrap table { min-width: 720px; }
+
+  .badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+  .badge.finished { background: rgba(12,163,12,0.14); color: var(--good); }
+  .badge.reading { background: rgba(42,120,214,0.14); color: var(--series-1); }
+  .badge.to-read { background: rgba(137,135,129,0.16); color: var(--text-secondary); }
+
+  .row-actions { display: flex; gap: 6px; }
+  .row-actions button { font-size: 11px; padding: 4px 8px; border-radius: 6px; }
+
+  .modal-backdrop {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    align-items: center; justify-content: center; z-index: 50; padding: 20px;
+  }
+  .modal-backdrop.active { display: flex; }
+  .modal {
+    background: var(--surface-1); border-radius: 14px; padding: 22px; width: 100%; max-width: 520px;
+    max-height: 88vh; overflow-y: auto; box-shadow: 0 8px 40px rgba(0,0,0,0.3);
+  }
+  .modal h2 { margin: 0 0 16px; font-size: 17px; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .form-grid .full { grid-column: 1 / -1; }
+  .form-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary); font-weight: 600; }
+  .form-grid input, .form-grid select, .form-grid textarea {
+    font-family: inherit; font-size: 13px; padding: 8px 10px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--page-plane); color: var(--text-primary);
+  }
+  .form-grid textarea { resize: vertical; min-height: 50px; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+  .modal-actions .danger { color: #e34948; margin-right: auto; }
+
+  .progress-bar { background: var(--gridline); border-radius: 999px; height: 10px; overflow: hidden; margin: 8px 0 4px; }
+  .progress-bar > div { background: var(--series-1); height: 100%; border-radius: 999px; transition: width .3s; }
+
+  .empty-state { text-align: center; color: var(--text-muted); padding: 40px 20px; font-size: 13px; }
+  .footer-note { text-align: center; color: var(--text-muted); font-size: 11px; margin-top: 30px; }
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: var(--text-primary); color: var(--page-plane); font-size: 13px;
+    padding: 9px 16px; border-radius: 8px; opacity: 0; pointer-events: none; transition: opacity .25s;
+    z-index: 100;
+  }
+  .toast.show { opacity: 1; }
+  .no-award { opacity: 0.55; font-style: italic; }
+  input[type=checkbox] { width: 16px; height: 16px; }
+  .stars { color: var(--text-muted); font-size: 11px; }
+</style>
+
+<div class="app">
+  <header class="top">
+    <div>
+      <h1>📚 Reading Tracker</h1>
+      <div class="sub" id="headerSub">Loading…</div>
+      <div class="sub" id="syncSub" style="margin-top:2px;"></div>
+    </div>
+    <div class="header-actions">
+      <button class="icon-btn" id="themeToggle" title="Toggle theme">🌓</button>
+      <button class="icon-btn" id="syncBtn">🔄 Sync from Drive</button>
+      <button class="icon-btn" id="exportBtn">Export backup</button>
+      <button class="icon-btn" id="importBtn">Import backup</button>
+      <input type="file" id="importFile" accept=".json" style="display:none">
+      <button class="btn primary" id="addBookBtn">+ Add Book</button>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button data-tab="dashboard" class="active">Dashboard</button>
+    <button data-tab="library">Library</button>
+    <button data-tab="pulitzer">Pulitzer Challenge</button>
+  </nav>
+
+  <section class="panel active" id="panel-dashboard"></section>
+  <section class="panel" id="panel-library"></section>
+  <section class="panel" id="panel-pulitzer"></section>
+
+  <div class="footer-note">Data is stored locally in this browser (localStorage). Use Export backup regularly to keep a copy.</div>
+</div>
+
+<div class="modal-backdrop" id="bookModalBackdrop">
+  <div class="modal">
+    <h2 id="bookModalTitle">Add Book</h2>
+    <div class="form-grid" id="bookForm">
+      <label class="full">Title
+        <input type="text" id="f_title" required>
+      </label>
+      <label>Author
+        <input type="text" id="f_author">
+      </label>
+      <label>Genre
+        <input type="text" id="f_genre" list="genreList">
+        <datalist id="genreList"></datalist>
+      </label>
+      <label>Status
+        <select id="f_status">
+          <option value="finished">Finished</option>
+          <option value="reading">Currently Reading</option>
+          <option value="to-read">To Read</option>
+        </select>
+      </label>
+      <label>Rating (0–10)
+        <input type="number" id="f_rating" min="0" max="10" step="0.5">
+      </label>
+      <label>Pages
+        <input type="number" id="f_pages" min="0" step="1">
+      </label>
+      <label>Year Read
+        <input type="number" id="f_yearRead" min="1900" max="2100" step="1">
+      </label>
+      <label>Month Read
+        <select id="f_monthRead">
+          <option value="">—</option>
+        </select>
+      </label>
+      <label>Published Year
+        <input type="number" id="f_publishedYear" min="1000" max="2100" step="1">
+      </label>
+      <label>Tags (comma separated)
+        <input type="text" id="f_tags">
+      </label>
+      <label class="full">Notes
+        <textarea id="f_notes"></textarea>
+      </label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn danger" id="deleteBookBtn" style="display:none;">Delete</button>
+      <button class="btn" id="cancelBookBtn">Cancel</button>
+      <button class="btn primary" id="saveBookBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------- Seed data (imported once from Books Read.xlsx) ---------- */
+const SEED_DATA = {"books": [{"id": "b1", "title": "The Neon Bible", "author": null, "genre": null, "publishedYear": null, "yearRead": null, "monthRead": null, "rating": null, "pages": null, "words": null, "hoursToRead": 0.0, "status": "to-read", "notes": "", "tags": []}, {"id": "b2", "title": "James", "author": null, "genre": null, "publishedYear": null, "yearRead": null, "monthRead": null, "rating": 9.0, "pages": null, "words": null, "hoursToRead": 0.0, "status": "finished", "notes": "", "tags": []}, {"id": "b3", "title": "End of Watch", "author": "Stephen King", "genre": "Horror", "publishedYear": 2016, "yearRead": 2026, "monthRead": 7, "rating": 8.5, "pages": 432, "words": 124848, "hoursToRead": 9.25, "status": "finished", "notes": "", "tags": []}, {"id": "b4", "title": "Finders Keepers", "author": "Stephen King", "genre": "Horror", "publishedYear": 2015, "yearRead": 2026, "monthRead": 7, "rating": 8.0, "pages": 434, "words": 125426, "hoursToRead": 9.29, "status": "finished", "notes": "", "tags": []}, {"id": "b5", "title": "Mr. Mercedes", "author": "Stephen King", "genre": "Horror", "publishedYear": 2014, "yearRead": 2026, "monthRead": 7, "rating": 8.5, "pages": 437, "words": 126293, "hoursToRead": 9.36, "status": "finished", "notes": "", "tags": []}, {"id": "b6", "title": "East of Eden", "author": "John Steinbeck", "genre": "Fiction", "publishedYear": 1952, "yearRead": 2026, "monthRead": 7, "rating": 9.5, "pages": 601, "words": 154457, "hoursToRead": 11.44, "status": "finished", "notes": "", "tags": []}, {"id": "b7", "title": "Down and Out in Paris and London", "author": "George Orwell", "genre": "Fiction", "publishedYear": 1933, "yearRead": 2026, "monthRead": 6, "rating": 9.0, "pages": 213, "words": 54741, "hoursToRead": 4.05, "status": "finished", "notes": "", "tags": []}, {"id": "b8", "title": "Taiwan Travelogue", "author": "Yang Shuang-zi", "genre": "Fiction", "publishedYear": 2020, "yearRead": 2026, "monthRead": 6, "rating": 8.5, "pages": 298, "words": 75394, "hoursToRead": 5.58, "status": "finished", "notes": "", "tags": []}, {"id": "b9", "title": "Butcher's Crossing", "author": "John Williams", "genre": "Western", "publishedYear": 1960, "yearRead": 2026, "monthRead": 6, "rating": 9.5, "pages": 274, "words": 86858, "hoursToRead": 6.43, "status": "finished", "notes": "", "tags": []}, {"id": "b10", "title": "The Bridge of San Luis Rey", "author": "Thornton Wilder", "genre": "Fiction", "publishedYear": 1927, "yearRead": 2026, "monthRead": 6, "rating": 7.5, "pages": 160, "words": 50720, "hoursToRead": 3.76, "status": "finished", "notes": "", "tags": []}, {"id": "b11", "title": "Cloud Atlas", "author": "David Mitchell", "genre": "Science Fiction", "publishedYear": 2004, "yearRead": 2026, "monthRead": 6, "rating": 8.5, "pages": 509, "words": 158808, "hoursToRead": 11.76, "status": "finished", "notes": "", "tags": []}, {"id": "b12", "title": "A Short Stay In Hell", "author": "Steven L. Peck", "genre": "Horror", "publishedYear": 2011, "yearRead": 2026, "monthRead": 6, "rating": 9.0, "pages": 108, "words": 33696, "hoursToRead": 2.5, "status": "finished", "notes": "", "tags": []}, {"id": "b13", "title": "Angel Down", "author": "Daniel Kraus", "genre": "Fiction", "publishedYear": 2026, "yearRead": 2026, "monthRead": 6, "rating": 9.0, "pages": 283, "words": 88296, "hoursToRead": 6.54, "status": "finished", "notes": "", "tags": []}, {"id": "b14", "title": "The Talisman", "author": "Stephen King", "genre": "Horror", "publishedYear": 1984, "yearRead": 2026, "monthRead": 5, "rating": 8.0, "pages": 656, "words": 204016, "hoursToRead": 15.11, "status": "finished", "notes": "", "tags": []}, {"id": "b15", "title": "A Parade of Horribles", "author": "Matt Dinniman", "genre": "Fantasy", "publishedYear": 2026, "yearRead": 2026, "monthRead": 5, "rating": 8.5, "pages": 704, "words": 219604, "hoursToRead": 16.27, "status": "finished", "notes": "", "tags": []}, {"id": "b16", "title": "Slaughterhouse-Five", "author": "Kurt Vonnegut Jr.", "genre": "Fiction", "publishedYear": 1969, "yearRead": 2026, "monthRead": 5, "rating": 8.5, "pages": 215, "words": 59125, "hoursToRead": 4.38, "status": "finished", "notes": "", "tags": []}, {"id": "b17", "title": "The Invisible Man", "author": "H.G. Wells", "genre": "Science Fiction", "publishedYear": 1897, "yearRead": 2026, "monthRead": 5, "rating": 8.0, "pages": 192, "words": 52800, "hoursToRead": 3.91, "status": "finished", "notes": "", "tags": []}, {"id": "b18", "title": "Annapurna", "author": "Maurice Herzog", "genre": "Nonfiction", "publishedYear": 1951, "yearRead": 2026, "monthRead": 5, "rating": 9.0, "pages": 314, "words": 86350, "hoursToRead": 6.4, "status": "finished", "notes": "", "tags": []}, {"id": "b19", "title": "Lone Women", "author": "Victor LaValle", "genre": "Horror", "publishedYear": 2023, "yearRead": 2026, "monthRead": 4, "rating": 7.5, "pages": 275, "words": 75625, "hoursToRead": 5.6, "status": "finished", "notes": "", "tags": []}, {"id": "b20", "title": "The Left Hand of Darkness", "author": "Ursula k. Le Guin", "genre": "Science Fiction", "publishedYear": 1969, "yearRead": 2026, "monthRead": 4, "rating": 8.5, "pages": 304, "words": 83600, "hoursToRead": 6.19, "status": "finished", "notes": "", "tags": []}, {"id": "b21", "title": "The End of The World As We Know It", "author": "Christopher Golden", "genre": "Horror", "publishedYear": 2025, "yearRead": 2026, "monthRead": 4, "rating": 8.5, "pages": 779, "words": 214225, "hoursToRead": 15.87, "status": "finished", "notes": "", "tags": []}, {"id": "b22", "title": "Ubik", "author": "Phillip K. Dick", "genre": "Science Fiction", "publishedYear": 1969, "yearRead": 2026, "monthRead": 4, "rating": 8.5, "pages": 288, "words": 79200, "hoursToRead": 5.87, "status": "finished", "notes": "", "tags": []}, {"id": "b23", "title": "Cochise: Chiricahua Apache Chief", "author": "Edwin R. Sweeney", "genre": "History", "publishedYear": 1991, "yearRead": 2026, "monthRead": 4, "rating": 7.0, "pages": 526, "words": 144650, "hoursToRead": 10.71, "status": "finished", "notes": "", "tags": []}, {"id": "b24", "title": "I'm Glad My Mom Died", "author": "Jennette McCurdy", "genre": "Nonfiction", "publishedYear": 2022, "yearRead": 2026, "monthRead": 4, "rating": 8.5, "pages": 304, "words": 83600, "hoursToRead": 6.19, "status": "finished", "notes": "", "tags": []}, {"id": "b25", "title": "Confederacy of Dunces", "author": "John Kennedy Toole", "genre": "Fiction", "publishedYear": 1980, "yearRead": 2026, "monthRead": 4, "rating": 9.0, "pages": 394, "words": 124898, "hoursToRead": 9.25, "status": "finished", "notes": "", "tags": []}, {"id": "b26", "title": "Red Dragon", "author": "Thomas Harris", "genre": "Horror", "publishedYear": 1981, "yearRead": 2026, "monthRead": 4, "rating": 8.5, "pages": 454, "words": 139832, "hoursToRead": 10.36, "status": "finished", "notes": "", "tags": []}, {"id": "b27", "title": "One Flew Over The Cuckoos Nest", "author": "Ken Kesey", "genre": "Fiction", "publishedYear": 1962, "yearRead": 2026, "monthRead": 4, "rating": 8.0, "pages": 277, "words": 87809, "hoursToRead": 6.5, "status": "finished", "notes": "", "tags": []}, {"id": "b28", "title": "The Silent Patient", "author": "Alex Michaelides", "genre": "Thriller", "publishedYear": 2019, "yearRead": 2026, "monthRead": 3, "rating": 7.5, "pages": 336, "words": 97104, "hoursToRead": 7.19, "status": "finished", "notes": "", "tags": []}, {"id": "b29", "title": "Twice 22", "author": "Ray Bradbury", "genre": "Science Fiction", "publishedYear": 1966, "yearRead": 2026, "monthRead": 3, "rating": 7.5, "pages": 406, "words": 134792, "hoursToRead": 9.98, "status": "finished", "notes": "", "tags": []}, {"id": "b30", "title": "Breakfast of Champions", "author": "Kurt Vonnegut Jr.", "genre": "Fiction", "publishedYear": 1973, "yearRead": 2026, "monthRead": 3, "rating": 7.0, "pages": 303, "words": 96960, "hoursToRead": 7.18, "status": "finished", "notes": "", "tags": []}, {"id": "b31", "title": "The Hero of Ages", "author": "Brandon Sanderson", "genre": "Fantasy", "publishedYear": 2008, "yearRead": 2026, "monthRead": 3, "rating": 9.0, "pages": 572, "words": 178464, "hoursToRead": 13.22, "status": "finished", "notes": "", "tags": []}, {"id": "b32", "title": "The Well of Ascension", "author": "Brandon Sanderson", "genre": "Fantasy", "publishedYear": 2007, "yearRead": 2026, "monthRead": 2, "rating": 8.5, "pages": 590, "words": 184080, "hoursToRead": 13.64, "status": "finished", "notes": "", "tags": []}, {"id": "b33", "title": "Mistborn", "author": "Brandon Sanderson", "genre": "Fantasy", "publishedYear": 2006, "yearRead": 2026, "monthRead": 2, "rating": 10.0, "pages": 541, "words": 168792, "hoursToRead": 12.5, "status": "finished", "notes": "", "tags": []}, {"id": "b34", "title": "The Penguin History of New Zealanad", "author": "Michael King", "genre": "History", "publishedYear": 2004, "yearRead": 2026, "monthRead": 4, "rating": null, "pages": 570, "words": 135090, "hoursToRead": 10.01, "status": "to-read", "notes": "", "tags": []}, {"id": "b35", "title": "Operation Bounce House", "author": "Matt Dinniman", "genre": "Science Fiction", "publishedYear": 2026, "yearRead": 2026, "monthRead": 2, "rating": 9.0, "pages": 448, "words": 123200, "hoursToRead": 9.13, "status": "finished", "notes": "", "tags": []}, {"id": "b36", "title": "The Green Mile", "author": "Stephen King", "genre": "Horror", "publishedYear": 1996, "yearRead": 2026, "monthRead": 2, "rating": 9.0, "pages": 592, "words": 180560, "hoursToRead": 13.37, "status": "finished", "notes": "", "tags": []}, {"id": "b37", "title": "Greenlights", "author": "Matthew McConaughey", "genre": "Nonfiction", "publishedYear": 2020, "yearRead": 2026, "monthRead": 2, "rating": 7.5, "pages": 289, "words": 68493, "hoursToRead": 5.07, "status": "finished", "notes": "", "tags": []}, {"id": "b38", "title": "American Psycho", "author": "Brett Easton Ellis", "genre": "Fiction", "publishedYear": 1991, "yearRead": 2026, "monthRead": 2, "rating": 8.0, "pages": 399, "words": 122493, "hoursToRead": 9.07, "status": "finished", "notes": "", "tags": []}, {"id": "b39", "title": "The Man In the High Castle", "author": "Phillip K. Dick", "genre": "Science Fiction", "publishedYear": 1992, "yearRead": 2026, "monthRead": 1, "rating": 7.5, "pages": 259, "words": 85988, "hoursToRead": 6.37, "status": "finished", "notes": "", "tags": []}, {"id": "b40", "title": "Killers of the Flower Moon", "author": "David Grann", "genre": "History", "publishedYear": 2023, "yearRead": 2026, "monthRead": 1, "rating": 8.0, "pages": 338, "words": 99038, "hoursToRead": 7.34, "status": "finished", "notes": "", "tags": []}, {"id": "b41", "title": "Animal Farm", "author": "George Orwell", "genre": "Fiction", "publishedYear": 1945, "yearRead": 2026, "monthRead": 1, "rating": 9.0, "pages": 141, "words": 46812, "hoursToRead": 3.47, "status": "finished", "notes": "", "tags": []}, {"id": "b42", "title": "The Women", "author": "Kristin Hannah", "genre": "Historical Fiction", "publishedYear": 2024, "yearRead": 2026, "monthRead": 1, "rating": 9.5, "pages": 471, "words": 111627, "hoursToRead": 8.27, "status": "finished", "notes": "", "tags": []}, {"id": "b43", "title": "Australia: A History", "author": "Tony Abbott", "genre": "History", "publishedYear": 2025, "yearRead": 2026, "monthRead": 1, "rating": 8.0, "pages": 448, "words": 123200, "hoursToRead": 9.13, "status": "finished", "notes": "", "tags": []}, {"id": "b44", "title": "Dust", "author": "Hugh Howey", "genre": "Science Fiction", "publishedYear": 2013, "yearRead": 2026, "monthRead": 1, "rating": 9.0, "pages": 416, "words": 129292, "hoursToRead": 9.58, "status": "finished", "notes": "", "tags": []}, {"id": "b45", "title": "Shift", "author": "Hugh Howey", "genre": "Science Fiction", "publishedYear": 2013, "yearRead": 2026, "monthRead": 1, "rating": 8.5, "pages": 579, "words": 180648, "hoursToRead": 13.38, "status": "finished", "notes": "", "tags": []}, {"id": "b46", "title": "Mother Night", "author": "Kurt Vonnegut Jr.", "genre": "Fiction", "publishedYear": 1961, "yearRead": 2025, "monthRead": 12, "rating": 8.5, "pages": 282, "words": 89394, "hoursToRead": 6.62, "status": "finished", "notes": "", "tags": []}, {"id": "b47", "title": "Wool", "author": "Hugh Howey", "genre": "Science Fiction", "publishedYear": 2011, "yearRead": 2025, "monthRead": 12, "rating": 8.0, "pages": 509, "words": 158808, "hoursToRead": 11.76, "status": "finished", "notes": "", "tags": []}, {"id": "b48", "title": "Rose Madder", "author": "Stephen King", "genre": "Horror", "publishedYear": 1995, "yearRead": 2025, "monthRead": 12, "rating": 7.0, "pages": 420, "words": 173477, "hoursToRead": 12.85, "status": "finished", "notes": "", "tags": []}, {"id": "b49", "title": "Shadows Upon Time", "author": "Christopher Ruocchio", "genre": "Science Fiction", "publishedYear": 2025, "yearRead": 2025, "monthRead": 12, "rating": 9.5, "pages": 928, "words": 289536, "hoursToRead": 21.45, "status": "finished", "notes": "", "tags": []}, {"id": "b50", "title": "Dark Matter", "author": "Blake Crouch", "genre": "Science Fiction", "publishedYear": 2016, "yearRead": 2025, "monthRead": 12, "rating": 8.5, "pages": 342, "words": 98838, "hoursToRead": 7.32, "status": "finished", "notes": "", "tags": []}, {"id": "b51", "title": "The Strength of the Few", "author": "James Islington", "genre": "Science Fiction", "publishedYear": 2025, "yearRead": 2025, "monthRead": 12, "rating": 9.0, "pages": 720, "words": 224640, "hoursToRead": 16.64, "status": "finished", "notes": "", "tags": []}, {"id": "b52", "title": "The Will of the Many", "author": "James Islington", "genre": "Science Fiction", "publishedYear": 2023, "yearRead": 2025, "monthRead": 11, "rating": 9.5, "pages": 639, "words": 187227, "hoursToRead": 13.87, "status": "finished", "notes": "", "tags": []}, {"id": "b53", "title": "IT", "author": "Stephen King", "genre": "Horror", "publishedYear": 1986, "yearRead": 2025, "monthRead": 11, "rating": 9.0, "pages": 1138, "words": 441156, "hoursToRead": 32.68, "status": "finished", "notes": "", "tags": []}, {"id": "b54", "title": "Boone's Lick", "author": "Larry McMurty", "genre": "Western", "publishedYear": 2000, "yearRead": 2025, "monthRead": 11, "rating": 8.0, "pages": 287, "words": 78925, "hoursToRead": 5.85, "status": "finished", "notes": "", "tags": []}, {"id": "b55", "title": "The Dregs of Empire", "author": "Christopher Ruocchio", "genre": "Fantasy", "publishedYear": 2023, "yearRead": 2025, "monthRead": 11, "rating": 7.5, "pages": 332, "words": 103584, "hoursToRead": 7.67, "status": "finished", "notes": "", "tags": []}, {"id": "b56", "title": "The Hobgoblin Riot", "author": "Matt Dinniman", "genre": "Fantasy", "publishedYear": 2018, "yearRead": 2025, "monthRead": 10, "rating": 9.0, "pages": 589, "words": 176100, "hoursToRead": 13.04, "status": "finished", "notes": "", "tags": []}, {"id": "b57", "title": "The Nightingale", "author": "Kristin Hannah", "genre": "Historical Fiction", "publishedYear": 2015, "yearRead": 2025, "monthRead": 10, "rating": 9.0, "pages": 440, "words": 104280, "hoursToRead": 7.72, "status": "finished", "notes": "", "tags": []}, {"id": "b58", "title": "Dominion of Blades", "author": "Matt Dinniman", "genre": "Fantasy", "publishedYear": 2017, "yearRead": 2025, "monthRead": 10, "rating": 9.0, "pages": 430, "words": 134160, "hoursToRead": 9.94, "status": "finished", "notes": "", "tags": []}, {"id": "b59", "title": "Hollow Kingdom", "author": "Kira Jane Buxton", "genre": "Fantasy", "publishedYear": 2019, "yearRead": 2025, "monthRead": 10, "rating": 8.0, "pages": 308, "words": 96096, "hoursToRead": 7.12, "status": "finished", "notes": "", "tags": []}, {"id": "b60", "title": "The Wind Through The Keyhole", "author": "Stephen King", "genre": "Fantasy", "publishedYear": 2012, "yearRead": 2025, "monthRead": 10, "rating": 7.5, "pages": 336, "words": 91598, "hoursToRead": 6.79, "status": "finished", "notes": "", "tags": []}, {"id": "b61", "title": "The Wager", "author": "David Grann", "genre": "Historical Fiction", "publishedYear": 2023, "yearRead": 2025, "monthRead": 9, "rating": 8.5, "pages": 352, "words": 83424, "hoursToRead": 6.18, "status": "finished", "notes": "", "tags": []}, {"id": "b62", "title": "The Dark Tower", "author": "Stephen King", "genre": "Fantasy", "publishedYear": 2004, "yearRead": 2025, "monthRead": 9, "rating": 8.5, "pages": 845, "words": 227350, "hoursToRead": 16.84, "status": "finished", "notes": "", "tags": []}, {"id": "b63", "title": "Queen Amid the Ashes", "author": "Christopher Ruocchio", "genre": "Science Fiction", "publishedYear": 2022, "yearRead": 2025, "monthRead": 9, "rating": 8.5, "pages": 173, "words": 53976, "hoursToRead": 4.0, "status": "finished", "notes": "", "tags": []}, {"id": "b64", "title": "All Quiet On The Western Front", "author": "Erich Maria Remarque", "genre": "Historical Fiction", "publishedYear": 1987, "yearRead": 2025, "monthRead": 9, "rating": 8.0, "pages": 296, "words": 93832, "hoursToRead": 6.95, "status": "finished", "notes": "", "tags": []}, {"id": "b65", "title": "Song of Susannah", "author": "Stephen King", "genre": "Fantasy", "publishedYear": 2004, "yearRead": 2025, "monthRead": 9, "rating": 8.0, "pages": 432, "words": 126253, "hoursToRead": 9.35, "status": "finished", "notes": "", "tags": []}, {"id": "b66", "title": "In Memoriam", "author": "Alice Winn", "genre": "Historical Fiction", "publishedYear": 2023, "yearRead": 2025, "monthRead": 8, "rating": 9.0, "pages": 382, "words": 90534, "hoursToRead": 6.71, "status": "finished", "notes": "", "tags": []}, {"id": "b67", "title": "The Wolves of the Calla", "author": "Stephen King", "genre": "Fantasy", "publishedYear": 2003, "yearRead": 2025, "monthRead": 8, "rating": 9.0, "pages": 714, "words": 241435, "hoursToRead": 17.88, "status": "finished", "notes": "", "tags": []}, {"id": "b68", "title": "More Tales of Pirx The Pilot", "author": "Stanislaw Lem", "genre": "Science Fiction", "publishedYear": 1966, "yearRead": 2025, "monthRead": 8, "rating": 7.5, "pages": 232, "words": 70000, "hoursToRead": 5.19, "status": "finished", "notes": "", "tags": []}, {"id": "b69", "title": "The Lesser Devil", "author": "Christopher Ruocchio", "genre": "Science Fiction", "publishedYear": 2020, "yearRead": 2025, "monthRead": 8, "rating": 9.0, "pages": 185, "words": 57720, "hoursToRead": 4.28, "status": "finished", "notes": "", "tags": []}, {"id": "b70", "title": "Wizard and Glass", "author": "Stephen King", "genre": "Fantasy", "publishedYear": 1997, "yearRead": 2025, "monthRead": 8, "rating": 9.5, "pages": 787, "words": 254432, "hoursToRead": 18.85, "status": "finished", "notes": "", "tags": []}, {"id": "b71", "title": "The God of The Woods", "author": "Liz Moore", "genre": "Mystery", "publishedYear": 2024, "yearRead": 2025, "monthRead": 8, "rating": 7.5, "pages": 490, "words": 141610, "hoursToRead": 10.49, "status": "finished", "notes": "", "tags": []}, {"id": "b72", "title": "The Waste Lands", "author": "Stephen King", "genre": "Fantasy", "publishedYear": 1991, "yearRead": 2025, "monthRead": 7, "rating": 8.5, "pages": 512, "words": 171879, "hoursToRead": 12.73, "status": "finished", "notes": "", "tags": []}, {"id": "b73", "title": "The Drawing of the Three", "author": "Stephen King", "genre": "Fantasy", "publishedYear": 1987, "yearRead": 2025, "monthRead": 7, "rating": 8.0, "pages": 400, "words": 125544, "hoursToRead": 9.3, "status": "finished", "notes": "", "tags": []}, {"id": "b74", "title": "Tender is the Flesh", "author": "Augustina Bazterrica", "genre": "Horror", "publishedYear": 2017, "yearRead": 2025, "monthRead": 7, "rating": 8.0, "pages": 209, "words": 65208, "hoursToRead": 4.83, "status": "finished", "notes": "", "tags": []}, {"id": "b75", "title": "Giovanni's Room", "author": "James Baldwin", "genre": "Fiction", "publishedYear": 1956, "yearRead": 2025, "monthRead": 7, "rating": 8.5, "pages": 169, "words": 48594, "hoursToRead": 3.6, "status": "finished", "notes": "", "tags": []}, {"id": "b76", "title": "Kaiju: Battlefield Surgeon", "author": "Matt Dinniman", "genre": "Fantasy", "publishedYear": 2019, "yearRead": 2025, "monthRead": 7, "rating": 9.5, "pages": 660, "words": 200000, "hoursToRead": 14.81, "status": "finished", "notes": "", "tags": []}, {"id": "b77", "title": "The Gunslinger", "author": "Stephen King", "genre": "Fantasy", "publishedYear": 1982, "yearRead": 2025, "monthRead": 6, "rating": 7.5, "pages": 288, "words": 62546, "hoursToRead": 4.63, "status": "finished", "notes": "", "tags": []}, {"id": "b78", "title": "The Grapes of Wrath", "author": "John Steinbeck", "genre": "Fiction", "publishedYear": 1939, "yearRead": 2025, "monthRead": 6, "rating": 9.0, "pages": 506, "words": 157232, "hoursToRead": 11.65, "status": "finished", "notes": "", "tags": []}, {"id": "b79", "title": "Cycle of the Werewolf", "author": "Stephen King", "genre": "Horror", "publishedYear": 1956, "yearRead": 2025, "monthRead": 6, "rating": 8.0, "pages": 127, "words": 15904, "hoursToRead": 1.18, "status": "finished", "notes": "", "tags": []}, {"id": "b80", "title": "Night Shift", "author": "Stephen King", "genre": "Horror", "publishedYear": 1977, "yearRead": 2025, "monthRead": 6, "rating": 9.0, "pages": 336, "words": 126918, "hoursToRead": 9.4, "status": "finished", "notes": "", "tags": []}, {"id": "b81", "title": "Thinner", "author": "Richard Bachman", "genre": "Horror", "publishedYear": 1984, "yearRead": 2025, "monthRead": 6, "rating": 8.5, "pages": 309, "words": 95716, "hoursToRead": 7.09, "status": "finished", "notes": "", "tags": []}, {"id": "b82", "title": "Duma Key", "author": "Stephen King", "genre": "Horror", "publishedYear": 2008, "yearRead": 2025, "monthRead": 6, "rating": 9.0, "pages": 607, "words": 204382, "hoursToRead": 15.14, "status": "finished", "notes": "", "tags": []}, {"id": "b83", "title": "Skeleton Crew", "author": "Stephen King", "genre": "Horror", "publishedYear": 1985, "yearRead": 2025, "monthRead": 5, "rating": 8.0, "pages": 512, "words": 214389, "hoursToRead": 15.88, "status": "finished", "notes": "", "tags": []}, {"id": "b84", "title": "Blood Meridian", "author": "Cormac McCarthy", "genre": "Western", "publishedYear": 1985, "yearRead": 2025, "monthRead": 5, "rating": 7.0, "pages": 351, "words": 110214, "hoursToRead": 8.16, "status": "finished", "notes": "", "tags": []}, {"id": "b85", "title": "Demon Copperhead", "author": "Barbara Kingsolver", "genre": "Fiction", "publishedYear": 2022, "yearRead": 2025, "monthRead": 5, "rating": 9.0, "pages": 560, "words": 132720, "hoursToRead": 9.83, "status": "finished", "notes": "", "tags": []}, {"id": "b86", "title": "The Bluest Eye", "author": "Toni Morrison", "genre": "Fiction", "publishedYear": 1970, "yearRead": 2025, "monthRead": 5, "rating": 7.0, "pages": 216, "words": 56592, "hoursToRead": 4.19, "status": "finished", "notes": "", "tags": []}, {"id": "b87", "title": "Circe", "author": "Madeline Miller", "genre": "Fantasy", "publishedYear": 2018, "yearRead": 2025, "monthRead": 5, "rating": 8.0, "pages": 393, "words": 98250, "hoursToRead": 7.28, "status": "finished", "notes": "", "tags": []}, {"id": "b88", "title": "Parable of the Sower", "author": "Octavia E. Butler", "genre": "Fiction", "publishedYear": 1993, "yearRead": 2025, "monthRead": 5, "rating": 8.5, "pages": 345, "words": 112125, "hoursToRead": 8.31, "status": "finished", "notes": "", "tags": []}, {"id": "b89", "title": "This Inevitable Ruin", "author": "Matt Dinniman", "genre": "Fantasy", "publishedYear": 2024, "yearRead": 2025, "monthRead": 5, "rating": 10.0, "pages": 724, "words": 270000, "hoursToRead": 20.0, "status": "finished", "notes": "", "tags": []}, {"id": "b90", "title": "The Eye of the Bedlam Bride", "author": "Matt Dinniman", "genre": "Fantasy", "publishedYear": 2023, "yearRead": 2025, "monthRead": 5, "rating": 9.0, "pages": 832, "words": 208000, "hoursToRead": 15.41, "status": "finished", "notes": "", "tags": []}, {"id": "b91", "title": "The Butcher's Masquerade", "author": "Matt Dinniman", "genre": "Fantasy", "publishedYear": 2022, "yearRead": 2025, "monthRead": 4, "rating": 9.0, "pages": 732, "words": 228384, "hoursToRead": 16.92, "status": "finished", "notes": "", "tags": []}, {"id": "b92", "title": "Master of the Game", "author": "Sidney Sheldon", "genre": "Thriller", "publishedYear": 1982, "yearRead": 2025, "monthRead": 4, "rating": 9.0, "pages": 403, "words": 119805, "hoursToRead": 8.87, "status": "finished", "notes": "", "tags": []}, {"id": "b93", "title": "The Gate of The Feral Gods", "author": "Matt Dinniman", "genre": "Fantasy", "publishedYear": 2021, "yearRead": 2025, "monthRead": 4, "rating": 8.5, "pages": 586, "words": 182832, "hoursToRead": 13.54, "status": "finished", "notes": "", "tags": []}, {"id": "b94", "title": "The Worst Hard Time: The Untold Story of Those Who Survived the Great American Dust Bowl", "author": "Timothy Egan", "genre": "Historical Fiction", "publishedYear": 2005, "yearRead": 2025, "monthRead": 4, "rating": 8.0, "pages": 352, "words": 83424, "hoursToRead": 6.18, "status": "finished", "notes": "", "tags": []}, {"id": "b95", "title": "Shogun", "author": "James Clavell", "genre": "Historical Fiction", "publishedYear": 1975, "yearRead": 2025, "monthRead": 4, "rating": 10.0, "pages": 1152, "words": 298368, "hoursToRead": 22.1, "status": "finished", "notes": "", "tags": []}, {"id": "b96", "title": "I Who Have Never Known Men", "author": "Jacqueline Harpman", "genre": "Science Fiction", "publishedYear": 1995, "yearRead": 2025, "monthRead": 3, "rating": 8.5, "pages": 208, "words": 56678, "hoursToRead": 4.2, "status": "finished", "notes": "", "tags": []}, {"id": "b97", "title": "The Dungeon Anarchist's Cookbook", "author": "Matt Dinniman", "genre": "Fantasy", "publishedYear": 2021, "yearRead": 2025, "monthRead": 3, "rating": 8.0, "pages": 534, "words": 166608, "hoursToRead": 12.34, "status": "finished", "notes": "", "tags": []}, {"id": "b98", "title": "Carls Doomsday Scenario", "author": "Matt Dinniman", "genre": "Fantasy", "publishedYear": 2021, "yearRead": 2025, "monthRead": 3, "rating": 8.5, "pages": 364, "words": 113568, "hoursToRead": 8.41, "status": "finished", "notes": "", "tags": []}, {"id": "b99", "title": "Dungeon Crawler Carl", "author": "Matt Dinniman", "genre": "Fantasy", "publishedYear": 2020, "yearRead": 2025, "monthRead": 3, "rating": 9.5, "pages": 446, "words": 139152, "hoursToRead": 10.31, "status": "finished", "notes": "", "tags": []}, {"id": "b100", "title": "Braiding Sweetgrass", "author": "Robin Wall Kimmerer", "genre": "Fiction", "publishedYear": 2013, "yearRead": 2025, "monthRead": 3, "rating": 8.0, "pages": 408, "words": 96616, "hoursToRead": 7.16, "status": "finished", "notes": "", "tags": []}, {"id": "b101", "title": "Firestarter", "author": "Stephen King", "genre": "Horror", "publishedYear": 1980, "yearRead": 2025, "monthRead": 2, "rating": 8.5, "pages": 426, "words": 150863, "hoursToRead": 11.18, "status": "finished", "notes": "", "tags": []}, {"id": "b102", "title": "The Underground Railroad", "author": "Colson Whitehead", "genre": "Historical Fiction", "publishedYear": 2016, "yearRead": 2025, "monthRead": 2, "rating": 8.5, "pages": 320, "words": 75840, "hoursToRead": 5.62, "status": "finished", "notes": "", "tags": []}, {"id": "b103", "title": "The Exorcist", "author": "William Peter Blatty", "genre": "Horror", "publishedYear": 1971, "yearRead": 2025, "monthRead": 2, "rating": 9.0, "pages": 325, "words": 122045, "hoursToRead": 9.04, "status": "finished", "notes": "", "tags": []}, {"id": "b104", "title": "Flowers for Algernon", "author": "Daniel Keyes", "genre": "Fiction", "publishedYear": 2004, "yearRead": 2025, "monthRead": 2, "rating": 9.0, "pages": 311, "words": 86147, "hoursToRead": 6.38, "status": "finished", "notes": "", "tags": []}, {"id": "b105", "title": "Solaris", "author": "Stanislaw Lem", "genre": "Science Fiction", "publishedYear": 1961, "yearRead": 2025, "monthRead": 2, "rating": 8.0, "pages": 204, "words": 67728, "hoursToRead": 5.02, "status": "finished", "notes": "", "tags": []}, {"id": "b106", "title": "The Eyes of the Dragon", "author": "Stephen King", "genre": "Fantasy", "publishedYear": 1987, "yearRead": 2025, "monthRead": 1, "rating": 8.0, "pages": 326, "words": 103523, "hoursToRead": 7.67, "status": "finished", "notes": "", "tags": []}, {"id": "b107", "title": "Elevation", "author": "Stephen King", "genre": "Fantasy", "publishedYear": 2018, "yearRead": 2025, "monthRead": 1, "rating": 9.0, "pages": 144, "words": 27143, "hoursToRead": 2.01, "status": "finished", "notes": "", "tags": []}, {"id": "b108", "title": "The Long Walk", "author": "Stephen King", "genre": "Horror", "publishedYear": 1979, "yearRead": 2025, "monthRead": 1, "rating": 8.0, "pages": 370, "words": 116180, "hoursToRead": 8.61, "status": "finished", "notes": "", "tags": []}, {"id": "b109", "title": "Rage", "author": "Stephen King", "genre": "Horror", "publishedYear": 1977, "yearRead": 2025, "monthRead": 1, "rating": 8.0, "pages": 131, "words": 41134, "hoursToRead": 3.05, "status": "finished", "notes": "", "tags": []}, {"id": "b110", "title": "Horns", "author": "Joe Hill", "genre": "Horror", "publishedYear": 2009, "yearRead": 2025, "monthRead": 1, "rating": 7.5, "pages": 368, "words": 104000, "hoursToRead": 7.7, "status": "finished", "notes": "", "tags": []}, {"id": "b111", "title": "The Fury of The Gods", "author": "John Gwynne", "genre": "Fantasy", "publishedYear": 2024, "yearRead": 2025, "monthRead": 1, "rating": 8.5, "pages": 528, "words": 164736, "hoursToRead": 12.2, "status": "finished", "notes": "", "tags": []}, {"id": "b112", "title": "The Ferryman", "author": "Justin Cronin", "genre": "Horror", "publishedYear": 2023, "yearRead": 2025, "monthRead": 1, "rating": 9.0, "pages": 538, "words": 157364, "hoursToRead": 11.66, "status": "finished", "notes": "", "tags": []}, {"id": "b113", "title": "The Hunger of The Gods", "author": "John Gwynne", "genre": "Fantasy", "publishedYear": 2022, "yearRead": 2024, "monthRead": null, "rating": 8.5, "pages": 633, "words": 197466, "hoursToRead": 14.63, "status": "finished", "notes": "", "tags": []}, {"id": "b114", "title": "The Shadow of The Gods", "author": "John Gwynne", "genre": "Fantasy", "publishedYear": 2021, "yearRead": 2024, "monthRead": null, "rating": 8.0, "pages": 480, "words": 149760, "hoursToRead": 11.09, "status": "finished", "notes": "", "tags": []}, {"id": "b115", "title": "No Country For Old Men", "author": "Cormac McCarthy", "genre": "Western", "publishedYear": 2005, "yearRead": 2024, "monthRead": null, "rating": 8.0, "pages": 309, "words": 84666, "hoursToRead": 6.27, "status": "finished", "notes": "", "tags": []}, {"id": "b116", "title": "Tales of Pirx The Pilot", "author": "Stanislaw Lem", "genre": "Science Fiction", "publishedYear": 1966, "yearRead": 2024, "monthRead": null, "rating": 8.5, "pages": 206, "words": 68392, "hoursToRead": 5.07, "status": "finished", "notes": "", "tags": []}, {"id": "b117", "title": "The Devil In The White City", "author": "Erik Larsen", "genre": "Historical Fiction", "publishedYear": 2003, "yearRead": 2024, "monthRead": null, "rating": 8.5, "pages": 464, "words": 109968, "hoursToRead": 8.15, "status": "finished", "notes": "", "tags": []}, {"id": "b118", "title": "Doctor Sleep", "author": "Stephen King", "genre": "Horror", "publishedYear": 2013, "yearRead": 2024, "monthRead": null, "rating": 9.5, "pages": 531, "words": 161622, "hoursToRead": 11.97, "status": "finished", "notes": "", "tags": []}, {"id": "b119", "title": "The Shining", "author": "Stephen King", "genre": "Horror", "publishedYear": 1977, "yearRead": 2024, "monthRead": null, "rating": 9.0, "pages": 447, "words": 161321, "hoursToRead": 11.95, "status": "finished", "notes": "", "tags": []}, {"id": "b120", "title": "Gerald's Game", "author": "Stephen King", "genre": "Horror", "publishedYear": 1992, "yearRead": 2024, "monthRead": null, "rating": 6.5, "pages": 332, "words": 101924, "hoursToRead": 7.55, "status": "finished", "notes": "", "tags": []}, {"id": "b121", "title": "Carrie", "author": "Stephen King", "genre": "Horror", "publishedYear": 1974, "yearRead": 2024, "monthRead": null, "rating": 8.0, "pages": 199, "words": 60581, "hoursToRead": 4.49, "status": "finished", "notes": "", "tags": []}, {"id": "b122", "title": "Four Past Midnight", "author": "Stephen King", "genre": "Horror", "publishedYear": 1990, "yearRead": 2024, "monthRead": null, "rating": 8.0, "pages": 763, "words": 298425, "hoursToRead": 22.11, "status": "finished", "notes": "", "tags": []}, {"id": "b123", "title": "Needful Things", "author": "Stephen King", "genre": "Horror", "publishedYear": 1991, "yearRead": 2024, "monthRead": null, "rating": 9.0, "pages": 690, "words": 251219, "hoursToRead": 18.61, "status": "finished", "notes": "", "tags": []}, {"id": "b124", "title": "Cell", "author": "Stephen King", "genre": "Horror", "publishedYear": 2006, "yearRead": 2024, "monthRead": null, "rating": 7.0, "pages": 351, "words": 121706, "hoursToRead": 9.02, "status": "finished", "notes": "", "tags": []}, {"id": "b125", "title": "Salem's Lot", "author": "Stephen King", "genre": "Horror", "publishedYear": 1975, "yearRead": 2024, "monthRead": null, "rating": 9.0, "pages": 439, "words": 157607, "hoursToRead": 11.67, "status": "finished", "notes": "", "tags": []}, {"id": "b126", "title": "The Girl Who Loved Tom Gordon", "author": "Stephen King", "genre": "Horror", "publishedYear": 1999, "yearRead": 2024, "monthRead": null, "rating": 7.0, "pages": 224, "words": 61413, "hoursToRead": 4.55, "status": "finished", "notes": "", "tags": []}, {"id": "b127", "title": "Tomorrow, and Tomorrow, and Tomorrow", "author": "Gabrielle Zevin", "genre": "Fiction", "publishedYear": 2022, "yearRead": 2024, "monthRead": null, "rating": 8.0, "pages": 401, "words": 101453, "hoursToRead": 7.52, "status": "finished", "notes": "", "tags": []}, {"id": "b128", "title": "The Dark Half", "author": "Stephen King", "genre": "Horror", "publishedYear": 1989, "yearRead": 2024, "monthRead": null, "rating": 8.0, "pages": 431, "words": 144452, "hoursToRead": 10.7, "status": "finished", "notes": "", "tags": []}, {"id": "b129", "title": "Dolores Clairborne", "author": "Stephen King", "genre": "Horror", "publishedYear": 1992, "yearRead": 2024, "monthRead": null, "rating": 8.0, "pages": 305, "words": 117564, "hoursToRead": 8.71, "status": "finished", "notes": "", "tags": []}, {"id": "b130", "title": "From a Buick 8", "author": "Stephen King", "genre": "Horror", "publishedYear": 2002, "yearRead": 2024, "monthRead": null, "rating": 5.0, "pages": 368, "words": 123912, "hoursToRead": 9.18, "status": "finished", "notes": "", "tags": []}, {"id": "b131", "title": "Night", "author": "Elie Wiesel", "genre": "Historical Fiction", "publishedYear": 1956, "yearRead": 2024, "monthRead": null, "rating": 7.0, "pages": 120, "words": 30084, "hoursToRead": 2.23, "status": "finished", "notes": "", "tags": []}, {"id": "b132", "title": "Under The Dome", "author": "Stephen King", "genre": "Horror", "publishedYear": 2009, "yearRead": 2024, "monthRead": null, "rating": 8.0, "pages": 1074, "words": 331018, "hoursToRead": 24.52, "status": "finished", "notes": "", "tags": []}, {"id": "b133", "title": "You Like it Darker", "author": "Stephen King", "genre": "Horror", "publishedYear": 2024, "yearRead": 2024, "monthRead": null, "rating": 7.5, "pages": 502, "words": 183667, "hoursToRead": 13.6, "status": "finished", "notes": "", "tags": []}, {"id": "b134", "title": "Disquiet Gods", "author": "Christopher Ruocchio", "genre": "Science Fiction", "publishedYear": 2024, "yearRead": 2024, "monthRead": null, "rating": 8.5, "pages": 704, "words": 290000, "hoursToRead": 21.48, "status": "finished", "notes": "", "tags": []}, {"id": "b135", "title": "Ahes of Man", "author": "Christopher Ruocchio", "genre": "Science Fiction", "publishedYear": 2023, "yearRead": 2024, "monthRead": null, "rating": 7.5, "pages": 544, "words": 169728, "hoursToRead": 12.57, "status": "finished", "notes": "", "tags": []}, {"id": "b136", "title": "Kingdoms of Death", "author": "Christopher Ruocchio", "genre": "Science Fiction", "publishedYear": 2022, "yearRead": 2024, "monthRead": null, "rating": 10.0, "pages": 544, "words": 169728, "hoursToRead": 12.57, "status": "finished", "notes": "", "tags": []}, {"id": "b137", "title": "Demon In White", "author": "Christopher Ruocchio", "genre": "Science Fiction", "publishedYear": 2020, "yearRead": 2024, "monthRead": null, "rating": 9.0, "pages": 784, "words": 277046, "hoursToRead": 20.52, "status": "finished", "notes": "", "tags": []}, {"id": "b138", "title": "Howling Dark", "author": "Christopher Ruocchio", "genre": "Science Fiction", "publishedYear": 2019, "yearRead": 2024, "monthRead": null, "rating": 8.0, "pages": 688, "words": 214656, "hoursToRead": 15.9, "status": "finished", "notes": "", "tags": []}, {"id": "b139", "title": "Empire of Silence", "author": "Christopher Ruocchio", "genre": "Science Fiction", "publishedYear": 2018, "yearRead": 2024, "monthRead": null, "rating": 7.0, "pages": 753, "words": 234936, "hoursToRead": 17.4, "status": "finished", "notes": "", "tags": []}, {"id": "b140", "title": "Cujo", "author": "Stephen King", "genre": "Horror", "publishedYear": 1981, "yearRead": 2024, "monthRead": null, "rating": 8.5, "pages": 319, "words": 118867, "hoursToRead": 8.8, "status": "finished", "notes": "", "tags": []}, {"id": "b141", "title": "The Dead Zone", "author": "Stephen King", "genre": "Horror", "publishedYear": 1979, "yearRead": 2024, "monthRead": null, "rating": 7.0, "pages": 428, "words": 150623, "hoursToRead": 11.16, "status": "finished", "notes": "", "tags": []}, {"id": "b142", "title": "The Stand (Uncut)", "author": "Stephen King", "genre": "Horror", "publishedYear": 1990, "yearRead": 2024, "monthRead": null, "rating": 9.5, "pages": 1152, "words": 467812, "hoursToRead": 34.65, "status": "finished", "notes": "", "tags": []}, {"id": "b143", "title": "Small Things Like These", "author": "Claire Keegan", "genre": "Fiction", "publishedYear": 2020, "yearRead": 2024, "monthRead": null, "rating": 6.0, "pages": 128, "words": 30336, "hoursToRead": 2.25, "status": "finished", "notes": "", "tags": []}, {"id": "b144", "title": "Misery", "author": "Stephen King", "genre": "Horror", "publishedYear": 1987, "yearRead": 2024, "monthRead": null, "rating": 9.0, "pages": 310, "words": 112409, "hoursToRead": 8.33, "status": "finished", "notes": "", "tags": []}, {"id": "b145", "title": "Words of Radiance", "author": "Brandon Sanderson", "genre": "Fantasy", "publishedYear": 2014, "yearRead": 2024, "monthRead": null, "rating": 8.5, "pages": 1087, "words": 339144, "hoursToRead": 25.12, "status": "finished", "notes": "", "tags": []}, {"id": "b146", "title": "The Way of Kings", "author": "Brandon Sanderson", "genre": "Fantasy", "publishedYear": 2010, "yearRead": 2024, "monthRead": null, "rating": 7.5, "pages": 1007, "words": 314184, "hoursToRead": 23.27, "status": "finished", "notes": "", "tags": []}, {"id": "b147", "title": "Remarkably Bright Creatures", "author": "Shelby Van Pelt", "genre": "Fiction", "publishedYear": 2022, "yearRead": 2024, "monthRead": null, "rating": 7.0, "pages": 360, "words": 105480, "hoursToRead": 7.81, "status": "finished", "notes": "", "tags": []}, {"id": "b148", "title": "Stoner", "author": "John Williams", "genre": "Fiction", "publishedYear": 1965, "yearRead": 2024, "monthRead": null, "rating": 9.0, "pages": 292, "words": 92564, "hoursToRead": 6.86, "status": "finished", "notes": "", "tags": []}, {"id": "b149", "title": "Dune Chapterhouse", "author": "Frank Herbert", "genre": "Science Fiction", "publishedYear": 1985, "yearRead": 2024, "monthRead": null, "rating": 8.0, "pages": 609, "words": 200361, "hoursToRead": 14.84, "status": "finished", "notes": "", "tags": []}, {"id": "b150", "title": "Heretics of Dune", "author": "Frank Herbert", "genre": "Science Fiction", "publishedYear": 1984, "yearRead": 2024, "monthRead": null, "rating": 8.0, "pages": 669, "words": 220770, "hoursToRead": 16.35, "status": "finished", "notes": "", "tags": []}, {"id": "b151", "title": "God Emperor of Dune", "author": "Frank Herbert", "genre": "Science Fiction", "publishedYear": 1981, "yearRead": 2024, "monthRead": null, "rating": 9.0, "pages": 587, "words": 194297, "hoursToRead": 14.39, "status": "finished", "notes": "", "tags": []}, {"id": "b152", "title": "Children of Dune", "author": "Frank Herbert", "genre": "Science Fiction", "publishedYear": 1976, "yearRead": 2024, "monthRead": null, "rating": 8.0, "pages": 609, "words": 203406, "hoursToRead": 15.07, "status": "finished", "notes": "", "tags": []}, {"id": "b153", "title": "Dune Messiah", "author": "Frank Herbert", "genre": "Science Fiction", "publishedYear": 1969, "yearRead": 2024, "monthRead": null, "rating": 8.0, "pages": 336, "words": 111552, "hoursToRead": 8.26, "status": "finished", "notes": "", "tags": []}, {"id": "b154", "title": "Dune", "author": "Frank Herbert", "genre": "Science Fiction", "publishedYear": 1965, "yearRead": 2024, "monthRead": null, "rating": 9.0, "pages": 658, "words": 218456, "hoursToRead": 16.18, "status": "finished", "notes": "", "tags": []}, {"id": "b155", "title": "The Yellow Wallpaper", "author": "Charlotte Perkins", "genre": "Horror", "publishedYear": 1892, "yearRead": 2024, "monthRead": null, "rating": 7.0, "pages": 63, "words": 8963, "hoursToRead": 0.66, "status": "finished", "notes": "", "tags": []}, {"id": "b156", "title": "The Rape of Nanking", "author": "Iris Chang", "genre": "Historical Fiction", "publishedYear": 1991, "yearRead": 2024, "monthRead": null, "rating": 7.0, "pages": 290, "words": 71920, "hoursToRead": 5.33, "status": "finished", "notes": "", "tags": []}, {"id": "b157", "title": "The Glass Castle", "author": "Jeannette Walls", "genre": "Fiction", "publishedYear": 2005, "yearRead": 2024, "monthRead": null, "rating": 8.0, "pages": 288, "words": 68256, "hoursToRead": 5.06, "status": "finished", "notes": "", "tags": []}, {"id": "b158", "title": "The Fisherman", "author": "John Langan", "genre": "Horror", "publishedYear": 2017, "yearRead": 2024, "monthRead": null, "rating": 8.0, "pages": 266, "words": 82992, "hoursToRead": 6.15, "status": "finished", "notes": "", "tags": []}, {"id": "b159", "title": "Lonesome Dove", "author": "Larry McMurtry", "genre": "Western", "publishedYear": 1985, "yearRead": 2024, "monthRead": null, "rating": 9.0, "pages": 960, "words": 243840, "hoursToRead": 18.06, "status": "finished", "notes": "", "tags": []}, {"id": "b160", "title": "The Perks of Being a Wallflower", "author": "Stephen Chbosky", "genre": "Fiction", "publishedYear": 1999, "yearRead": 2024, "monthRead": null, "rating": 9.0, "pages": 213, "words": 16438, "hoursToRead": 1.22, "status": "finished", "notes": "", "tags": []}, {"id": "b161", "title": "Pet Sematary", "author": "Stephen King", "genre": "Horror", "publishedYear": 1983, "yearRead": 2024, "monthRead": null, "rating": 8.0, "pages": 374, "words": 143094, "hoursToRead": 10.6, "status": "finished", "notes": "", "tags": []}, {"id": "b162", "title": "11/22/63", "author": "Stephen King", "genre": "Fantasy", "publishedYear": 2011, "yearRead": 2024, "monthRead": null, "rating": 10.0, "pages": 849, "words": 269543, "hoursToRead": 19.97, "status": "finished", "notes": "", "tags": []}], "pulitzer": [{"id": "p1", "book": "Angel Down", "author": "Daniel Kraus", "yearWon": 2026, "read": true, "rating": 9.0, "noAward": false}, {"id": "p2", "book": "James", "author": "Percival Everett", "yearWon": 2025, "read": false, "rating": null, "noAward": false}, {"id": "p3", "book": "Night Watch", "author": "Jayne Anne Phillips", "yearWon": 2024, "read": false, "rating": null, "noAward": false}, {"id": "p4", "book": "Demon Copperhead", "author": "Barbara Kingsolver", "yearWon": 2023, "read": true, "rating": 9.0, "noAward": false}, {"id": "p5", "book": "Trust", "author": "Hernan Diaz", "yearWon": 2023, "read": false, "rating": null, "noAward": false}, {"id": "p6", "book": "The Netanyahus", "author": "Joshua Cohen", "yearWon": 2022, "read": false, "rating": null, "noAward": false}, {"id": "p7", "book": "The Night Watchman", "author": "Louise Erdrich", "yearWon": 2021, "read": false, "rating": null, "noAward": false}, {"id": "p8", "book": "The Nickel Boys", "author": "Colson Whitehead", "yearWon": 2020, "read": false, "rating": null, "noAward": false}, {"id": "p9", "book": "The Overstory", "author": "Richard Powers", "yearWon": 2019, "read": false, "rating": null, "noAward": false}, {"id": "p10", "book": "Less", "author": "Andrew Sean Greet", "yearWon": 2018, "read": false, "rating": null, "noAward": false}, {"id": "p11", "book": "The Underground Railroad", "author": "Colson Whitehead", "yearWon": 2017, "read": true, "rating": 8.5, "noAward": false}, {"id": "p12", "book": "The Sympathizer", "author": "Viet Thanh Nguyen", "yearWon": 2016, "read": false, "rating": null, "noAward": false}, {"id": "p13", "book": "All the Lights We Cannot See", "author": "Anthony Doerr", "yearWon": 2015, "read": false, "rating": null, "noAward": false}, {"id": "p14", "book": "The Goldfinch", "author": "Donna Tartt", "yearWon": 2014, "read": false, "rating": null, "noAward": false}, {"id": "p15", "book": "The Orphan Master's Son", "author": "Adam Johnson", "yearWon": 2013, "read": false, "rating": null, "noAward": false}, {"id": "p16", "book": "No Award Given", "author": null, "yearWon": 2012, "read": false, "rating": null, "noAward": true}, {"id": "p17", "book": "A Visit from the Goon Squad", "author": "Jennifer Egan", "yearWon": 2011, "read": false, "rating": null, "noAward": false}, {"id": "p18", "book": "Tinkers", "author": "Paul Harding", "yearWon": 2010, "read": false, "rating": null, "noAward": false}, {"id": "p19", "book": "Olive Kitteridge", "author": "Elizabeth Strout", "yearWon": 2009, "read": false, "rating": null, "noAward": false}, {"id": "p20", "book": "The Brief Wondrous Life of Oscar Wao", "author": "Junot Diaz", "yearWon": 2008, "read": false, "rating": null, "noAward": false}, {"id": "p21", "book": "The Road", "author": "Cormac McCarthy", "yearWon": 2007, "read": false, "rating": null, "noAward": false}, {"id": "p22", "book": "March", "author": "Geraldine Brooks", "yearWon": 2006, "read": false, "rating": null, "noAward": false}, {"id": "p23", "book": "Gilead", "author": "Marilynn Robinson", "yearWon": 2005, "read": false, "rating": null, "noAward": false}, {"id": "p24", "book": "The Known World", "author": "Edward P. Jones", "yearWon": 2004, "read": false, "rating": null, "noAward": false}, {"id": "p25", "book": "Middlesex", "author": "Jeffery Eugenides", "yearWon": 2003, "read": false, "rating": null, "noAward": false}, {"id": "p26", "book": "Empire Falls", "author": "Richard Russo", "yearWon": 2002, "read": false, "rating": null, "noAward": false}, {"id": "p27", "book": "The Amazing Adventures of Cavalier Clay", "author": "Michael Chabon", "yearWon": 2001, "read": false, "rating": null, "noAward": false}, {"id": "p28", "book": "Interpreter or Maladies", "author": "Jhumpa Lahiri", "yearWon": 2000, "read": false, "rating": null, "noAward": false}, {"id": "p29", "book": "The Hours", "author": "Michael Cunningham", "yearWon": 1999, "read": false, "rating": null, "noAward": false}, {"id": "p30", "book": "American Pastoral", "author": "Philip Roth", "yearWon": 1998, "read": false, "rating": null, "noAward": false}, {"id": "p31", "book": "Martin Dressler: The Tale of an American Dreamer", "author": "Steven Millhauser", "yearWon": 1997, "read": false, "rating": null, "noAward": false}, {"id": "p32", "book": "Independence Day", "author": "Richard Ford", "yearWon": 1996, "read": false, "rating": null, "noAward": false}, {"id": "p33", "book": "The Stone Diaries", "author": "Carol Shields", "yearWon": 1995, "read": false, "rating": null, "noAward": false}, {"id": "p34", "book": "The Shipping News", "author": "E. Annie Proulx", "yearWon": 1994, "read": false, "rating": null, "noAward": false}, {"id": "p35", "book": "A Good Scent from a Strange Mountain", "author": "Robert Olen Butler", "yearWon": 1993, "read": false, "rating": null, "noAward": false}, {"id": "p36", "book": "A Thousand Acres", "author": "Jane Smiley", "yearWon": 1992, "read": false, "rating": null, "noAward": false}, {"id": "p37", "book": "Rabbit At Rest", "author": "John Updike", "yearWon": 1991, "read": false, "rating": null, "noAward": false}, {"id": "p38", "book": "The Mambo Kings Play Sonds of Love", "author": "Oscar Hijuelos", "yearWon": 1990, "read": false, "rating": null, "noAward": false}, {"id": "p39", "book": "Breathing Lessons", "author": "Anne Tyler", "yearWon": 1989, "read": false, "rating": null, "noAward": false}, {"id": "p40", "book": "Beloved", "author": "Toni Morrison", "yearWon": 1988, "read": false, "rating": null, "noAward": false}, {"id": "p41", "book": "A Summons to Memphis", "author": "Pete Taylor", "yearWon": 1987, "read": false, "rating": null, "noAward": false}, {"id": "p42", "book": "Lonesome Dove", "author": "Larry McMurtry", "yearWon": 1986, "read": true, "rating": 9.0, "noAward": false}, {"id": "p43", "book": "Foreign Affairs", "author": "Alison Lurie", "yearWon": 1985, "read": false, "rating": null, "noAward": false}, {"id": "p44", "book": "Ironweed", "author": "William Kennedy", "yearWon": 1984, "read": false, "rating": null, "noAward": false}, {"id": "p45", "book": "The Color Purple", "author": "Alice Walker", "yearWon": 1983, "read": false, "rating": null, "noAward": false}, {"id": "p46", "book": "Rabbit Is Rich", "author": "John Updike", "yearWon": 1982, "read": false, "rating": null, "noAward": false}, {"id": "p47", "book": "A Confederacy of Dunces", "author": "John Kennedy Toole", "yearWon": 1981, "read": true, "rating": 9.0, "noAward": false}, {"id": "p48", "book": "The Executioner's Song", "author": "Norman Mailer", "yearWon": 1980, "read": false, "rating": null, "noAward": false}, {"id": "p49", "book": "The Stories of John Cheever", "author": "John Cheever", "yearWon": 1979, "read": false, "rating": null, "noAward": false}, {"id": "p50", "book": "Elbow Room", "author": "James Alan McPherson", "yearWon": 1978, "read": false, "rating": null, "noAward": false}, {"id": "p51", "book": "No Award Given", "author": null, "yearWon": 1977, "read": false, "rating": null, "noAward": true}, {"id": "p52", "book": "Humboldt's Gift", "author": "Saul Bellow", "yearWon": 1976, "read": false, "rating": null, "noAward": false}, {"id": "p53", "book": "The Killer Angels", "author": "Michael Shaara", "yearWon": 1975, "read": false, "rating": null, "noAward": false}, {"id": "p54", "book": "No Award Given", "author": null, "yearWon": 1974, "read": false, "rating": null, "noAward": true}, {"id": "p55", "book": "The Optimist's Daughter", "author": "Eudora Welty", "yearWon": 1973, "read": false, "rating": null, "noAward": false}, {"id": "p56", "book": "Angle of Repose", "author": "Wallace Stegner", "yearWon": 1972, "read": false, "rating": null, "noAward": false}, {"id": "p57", "book": "No Award Given", "author": null, "yearWon": 1971, "read": false, "rating": null, "noAward": true}, {"id": "p58", "book": "Collected Stories", "author": "Jean Stafford", "yearWon": 1970, "read": false, "rating": null, "noAward": false}, {"id": "p59", "book": "House Made of Dawn", "author": "N. Scott Momaday", "yearWon": 1969, "read": false, "rating": null, "noAward": false}, {"id": "p60", "book": "The Confessions of Nat Turner", "author": "William Styron", "yearWon": 1968, "read": false, "rating": null, "noAward": false}, {"id": "p61", "book": "The Fixer", "author": "Bernard Malamud", "yearWon": 1967, "read": false, "rating": null, "noAward": false}, {"id": "p62", "book": "The Collected Stories", "author": "Katherine Anne Porter", "yearWon": 1966, "read": false, "rating": null, "noAward": false}, {"id": "p63", "book": "The Keeper of the House", "author": "Shirley Ann Grau", "yearWon": 1965, "read": false, "rating": null, "noAward": false}, {"id": "p64", "book": "No Award Given", "author": null, "yearWon": 1964, "read": false, "rating": null, "noAward": true}, {"id": "p65", "book": "The Reivers", "author": "William Faulkner", "yearWon": 1963, "read": false, "rating": null, "noAward": false}, {"id": "p66", "book": "The Edge of Sadness", "author": "Edwin O'Connor", "yearWon": 1962, "read": false, "rating": null, "noAward": false}, {"id": "p67", "book": "To Kill a Mockingbird", "author": "Harper Lee", "yearWon": 1961, "read": false, "rating": null, "noAward": false}, {"id": "p68", "book": "Advise and Consent", "author": "Allen Drury", "yearWon": 1960, "read": false, "rating": null, "noAward": false}, {"id": "p69", "book": "The Travels of Jaimie McPheeters", "author": "Robert Lewis Taylor", "yearWon": 1959, "read": false, "rating": null, "noAward": false}, {"id": "p70", "book": "A Death in the Family", "author": "James Agnee", "yearWon": 1958, "read": false, "rating": null, "noAward": false}, {"id": "p71", "book": "No Award Given", "author": null, "yearWon": 1957, "read": false, "rating": null, "noAward": true}, {"id": "p72", "book": "Andersonville", "author": "Mackinlay Kantor", "yearWon": 1956, "read": false, "rating": null, "noAward": false}, {"id": "p73", "book": "A Fable", "author": "William Faulkner", "yearWon": 1955, "read": false, "rating": null, "noAward": false}, {"id": "p74", "book": "No Award Given", "author": null, "yearWon": 1954, "read": false, "rating": null, "noAward": true}, {"id": "p75", "book": "The Old Man and the Sea", "author": "Ernest Hemingway", "yearWon": 1953, "read": false, "rating": null, "noAward": false}, {"id": "p76", "book": "The Caine Mutiny", "author": "Herman Wouk", "yearWon": 1952, "read": false, "rating": null, "noAward": false}, {"id": "p77", "book": "The Town", "author": "Conrad Richter", "yearWon": 1951, "read": false, "rating": null, "noAward": false}, {"id": "p78", "book": "The Way West", "author": "A. B. Guthrie", "yearWon": 1950, "read": false, "rating": null, "noAward": false}, {"id": "p79", "book": "Guard of Honor", "author": "James Gould Cozzens", "yearWon": 1949, "read": false, "rating": null, "noAward": false}, {"id": "p80", "book": "Tales of the South Pacific", "author": "James A. Michener", "yearWon": 1948, "read": false, "rating": null, "noAward": false}, {"id": "p81", "book": "All the King's Men", "author": "Robert Penn Warren", "yearWon": 1947, "read": false, "rating": null, "noAward": false}, {"id": "p82", "book": "No Award Given", "author": null, "yearWon": 1946, "read": false, "rating": null, "noAward": true}, {"id": "p83", "book": "A Bell for Adano", "author": "John Hersey", "yearWon": 1945, "read": false, "rating": null, "noAward": false}, {"id": "p84", "book": "Journey in the Dark", "author": "Martin Flavin", "yearWon": 1944, "read": false, "rating": null, "noAward": false}, {"id": "p85", "book": "Dragon's Teeth", "author": "Upton Sinclair", "yearWon": 1943, "read": false, "rating": null, "noAward": false}, {"id": "p86", "book": "In This our Life", "author": "Ellen Glasgow", "yearWon": 1942, "read": false, "rating": null, "noAward": false}, {"id": "p87", "book": "No Award Given", "author": null, "yearWon": 1941, "read": false, "rating": null, "noAward": true}, {"id": "p88", "book": "The Grapes of Wrath", "author": "John Steinbeck", "yearWon": 1940, "read": true, "rating": 9.0, "noAward": false}, {"id": "p89", "book": "The Yearling", "author": "Marjorie Kinnan Rawlings", "yearWon": 1939, "read": false, "rating": null, "noAward": false}, {"id": "p90", "book": "The Late George Apley", "author": "John Phillips Marquand", "yearWon": 1938, "read": false, "rating": null, "noAward": false}, {"id": "p91", "book": "Gone with the Wind", "author": "Margaret Mitchell", "yearWon": 1937, "read": false, "rating": null, "noAward": false}, {"id": "p92", "book": "Honey in the Horn", "author": "Harold L. Davis", "yearWon": 1936, "read": false, "rating": null, "noAward": false}, {"id": "p93", "book": "Now in November", "author": "Josephine Winslow Johnson", "yearWon": 1935, "read": false, "rating": null, "noAward": false}, {"id": "p94", "book": "Lamb in His Bosom", "author": "Caroline Miller", "yearWon": 1934, "read": false, "rating": null, "noAward": false}, {"id": "p95", "book": "The Store", "author": "T. S. Stribling", "yearWon": 1933, "read": false, "rating": null, "noAward": false}, {"id": "p96", "book": "The Good Earth", "author": "Pearl S. Buck", "yearWon": 1932, "read": false, "rating": null, "noAward": false}, {"id": "p97", "book": "Years of Grace", "author": "Margaret Ayers Barnes", "yearWon": 1931, "read": false, "rating": null, "noAward": false}, {"id": "p98", "book": "Laughing Boy", "author": "Oliver La Farge", "yearWon": 1930, "read": false, "rating": null, "noAward": false}, {"id": "p99", "book": "Scarlet Sister Mary", "author": "Julia Peterkin", "yearWon": 1929, "read": false, "rating": null, "noAward": false}, {"id": "p100", "book": "The Bridge of San Luis rey", "author": "Thornton Wilder", "yearWon": 1928, "read": true, "rating": 7.5, "noAward": false}, {"id": "p101", "book": "Early Autumn", "author": "Louis Bromfield", "yearWon": 1927, "read": false, "rating": null, "noAward": false}, {"id": "p102", "book": "Arrowsmith", "author": "Sinclair Lewis", "yearWon": 1926, "read": false, "rating": null, "noAward": false}, {"id": "p103", "book": "So Big", "author": "Edna Ferber", "yearWon": 1925, "read": false, "rating": null, "noAward": false}, {"id": "p104", "book": "The Able McLaughlins", "author": "Margaret Wilson", "yearWon": 1924, "read": false, "rating": null, "noAward": false}, {"id": "p105", "book": "One of Ours", "author": "Wila Cather", "yearWon": 1923, "read": false, "rating": null, "noAward": false}, {"id": "p106", "book": "Alice Adamns", "author": "Booth Tarkington", "yearWon": 1922, "read": false, "rating": null, "noAward": false}, {"id": "p107", "book": "The Age of Innocence", "author": "Edith Wharton", "yearWon": 1921, "read": false, "rating": null, "noAward": false}, {"id": "p108", "book": "No Award Given", "author": null, "yearWon": 1920, "read": false, "rating": null, "noAward": true}, {"id": "p109", "book": "The Magnificent Ambersons", "author": "Booth Tarkington", "yearWon": 1919, "read": false, "rating": null, "noAward": false}, {"id": "p110", "book": "His Family", "author": "Ernest Poole", "yearWon": 1918, "read": false, "rating": null, "noAward": false}]};
+
+/* ---------- State & persistence ---------- */
+const STORAGE_KEY = 'readingTrackerData_v1';
+let state = loadState();
+
+function loadState() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (raw) {
+    try { return JSON.parse(raw); } catch (e) { /* fall through to seed */ }
+  }
+  const fresh = {
+    books: SEED_DATA.books.map(b => ({ ...b, origin: 'drive' })),
+    pulitzer: SEED_DATA.pulitzer.slice()
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
+  return fresh;
+}
+function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+function uid(prefix) { return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+/* ---------- Google Sheets (published CSV) sync ---------- */
+const DRIVE_URL_KEY = 'rt_drive_books_csv_url';
+const DRIVE_SYNCED_AT_KEY = 'rt_drive_last_synced';
+const DEFAULT_DRIVE_BOOKS_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQgy4RCLalldjYsZc-71XG4GEz4Pg3xwtbwqICC7wdM8kJZWmhvtFaRoxEEu0GR7Fc7JleERJNtCy9f/pub?gid=0&single=true&output=csv';
+
+function getDriveUrl() { return localStorage.getItem(DRIVE_URL_KEY) || DEFAULT_DRIVE_BOOKS_CSV_URL; }
+function setDriveUrl(url) { localStorage.setItem(DRIVE_URL_KEY, url); }
+function getLastSyncedAt() { return localStorage.getItem(DRIVE_SYNCED_AT_KEY) || ''; }
+function setLastSyncedAt(iso) { localStorage.setItem(DRIVE_SYNCED_AT_KEY, iso); }
+
+function normKey(title, author) {
+  const norm = s => (s || '').toString().toLowerCase().trim().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return norm(title) + '|' + norm(author);
+}
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [], field = '', inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; }
+        else inQuotes = false;
+      } else field += c;
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ',') { row.push(field); field = ''; }
+      else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+      else if (c === '\r') { /* skip */ }
+      else field += c;
+    }
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+function parseBooksCsvRows(rows) {
+  const headerIdx = rows.findIndex(r => r.includes('Title') && r.includes('Author'));
+  if (headerIdx === -1) throw new Error('Could not find header row (looking for Title/Author columns)');
+  const headers = rows[headerIdx].map(h => h.trim());
+  const col = name => headers.indexOf(name);
+  const iTitle = col('Title'), iAuthor = col('Author'), iGenre = col('Genre'),
+        iPublished = col('Published'), iYearRead = col('Year Read'), iMonthRead = col('Month Read'),
+        iRead = col('Read'), iRating = col('Rating'), iPages = col('Pages'),
+        iWords = col('Words'), iHrs = col('Hrs to Read');
+
+  const num = v => { if (v == null) return null; const s = String(v).replace(/,/g, '').trim(); if (s === '') return null; const n = Number(s); return Number.isNaN(n) ? null : n; };
+  const str = v => { const s = (v || '').toString().trim(); return s === '' ? null : s; };
+
+  const out = [];
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r || r.every(c => (c || '').trim() === '')) continue;
+    const title = str(r[iTitle]);
+    if (!title) continue;
+    const monthRaw = iMonthRead >= 0 ? str(r[iMonthRead]) : null;
+    const month = monthRaw ? parseInt(monthRaw, 10) : null;
+    const readRaw = iRead >= 0 ? (r[iRead] || '').toString().trim().toUpperCase() : '';
+    const status = readRaw === 'TRUE' ? 'finished' : 'to-read';
+    out.push({
+      title,
+      author: iAuthor >= 0 ? str(r[iAuthor]) : null,
+      genre: iGenre >= 0 ? str(r[iGenre]) : null,
+      publishedYear: iPublished >= 0 ? num(r[iPublished]) : null,
+      yearRead: iYearRead >= 0 ? num(r[iYearRead]) : null,
+      monthRead: Number.isFinite(month) ? month : null,
+      rating: iRating >= 0 ? num(r[iRating]) : null,
+      pages: iPages >= 0 ? num(r[iPages]) : null,
+      words: iWords >= 0 ? num(r[iWords]) : null,
+      hoursToRead: iHrs >= 0 ? num(r[iHrs]) : null,
+      status
+    });
+  }
+  return out;
+}
+
+function mergeDriveBooks(freshRows) {
+  const freshMap = new Map(freshRows.map(r => [normKey(r.title, r.author), r]));
+  const merged = [];
+  state.books.forEach(existing => {
+    if (existing.origin === 'manual') { merged.push(existing); return; }
+    const key = normKey(existing.title, existing.author);
+    const fresh = freshMap.get(key);
+    if (fresh) {
+      merged.push({ ...existing, ...fresh, id: existing.id, notes: existing.notes, tags: existing.tags, origin: 'drive' });
+      freshMap.delete(key);
+    }
+    // else: row removed from the sheet -> drop it
+  });
+  freshMap.forEach(fresh => {
+    merged.push({ id: uid('b'), ...fresh, notes: '', tags: [], origin: 'drive' });
+  });
+  state.books = merged;
+  saveState();
+}
+
+async function syncFromDrive(silent) {
+  const url = getDriveUrl();
+  if (!url) {
+    if (!silent) {
+      const entered = prompt('Paste your published "Books" tab CSV link (File → Share → Publish to web):', '');
+      if (entered && entered.trim()) { setDriveUrl(entered.trim()); return syncFromDrive(false); }
+    }
+    return;
+  }
+  try {
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+    const rows = parseCsv(text);
+    const freshRows = parseBooksCsvRows(rows);
+
+    const existingDriveCount = state.books.filter(b => b.origin !== 'manual').length;
+    if (existingDriveCount > 5 && freshRows.length < existingDriveCount * 0.5) {
+      throw new Error(`Got only ${freshRows.length} rows vs ${existingDriveCount} expected — looks incomplete, skipped to avoid data loss`);
+    }
+
+    mergeDriveBooks(freshRows);
+    setLastSyncedAt(new Date().toISOString());
+    renderAll();
+    if (!silent) toast('Synced ' + freshRows.length + ' books from Drive');
+  } catch (err) {
+    if (!silent) toast('Sync failed: ' + err.message);
+    console.error('Drive sync failed', err);
+  }
+}
+
+function relativeTime(iso) {
+  if (!iso) return 'never';
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.round(diffMs / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return mins + ' min ago';
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return hrs + ' hr ago';
+  return Math.round(hrs / 24) + ' day(s) ago';
+}
+function updateSyncSub() {
+  const el = document.getElementById('syncSub');
+  el.textContent = getDriveUrl() ? ('Drive sync: last synced ' + relativeTime(getLastSyncedAt())) : 'Drive sync: not configured';
+}
+document.getElementById('syncBtn').addEventListener('click', () => syncFromDrive(false));
+
+/* ---------- Toast ---------- */
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+/* ---------- Theme toggle ---------- */
+(function initTheme() {
+  const saved = localStorage.getItem('rt_theme');
+  if (saved) document.documentElement.setAttribute('data-theme', saved);
+  document.getElementById('themeToggle').addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme');
+    const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const next = cur === 'dark' ? 'light' : (cur === 'light' ? 'dark' : (sysDark ? 'light' : 'dark'));
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('rt_theme', next);
+  });
+})();
+
+/* ---------- Tabs ---------- */
+document.querySelectorAll('nav.tabs button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('nav.tabs button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+/* ---------- Helpers ---------- */
+const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function finishedBooks() { return state.books.filter(b => b.status === 'finished'); }
+function fmtNum(n) { return n == null ? '—' : n.toLocaleString(); }
+function escapeHtml(s) {
+  return (s == null ? '' : String(s)).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ================= DASHBOARD ================= */
+function renderDashboard() {
+  const panel = document.getElementById('panel-dashboard');
+  const fin = finishedBooks();
+  const totalBooks = fin.length;
+  const totalPages = fin.reduce((s,b) => s + (b.pages||0), 0);
+  const totalHours = fin.reduce((s,b) => s + (b.hoursToRead||0), 0);
+  const ratings = fin.filter(b => b.rating != null).map(b => b.rating);
+  const avgRating = ratings.length ? (ratings.reduce((a,b)=>a+b,0)/ratings.length) : null;
+
+  // Books per year
+  const byYear = {};
+  fin.forEach(b => { if (b.yearRead) byYear[b.yearRead] = (byYear[b.yearRead]||0) + 1; });
+  const years = Object.keys(byYear).map(Number).sort((a,b)=>a-b);
+
+  // Year selector for monthly chart (default: latest year)
+  const selectedYear = window.__rt_selectedYear || (years.length ? years[years.length-1] : new Date().getFullYear());
+  window.__rt_selectedYear = selectedYear;
+  const byMonth = Array(12).fill(0);
+  fin.forEach(b => { if (b.yearRead === selectedYear && b.monthRead) byMonth[b.monthRead-1]++; });
+
+  // Genre breakdown
+  const byGenre = {};
+  fin.forEach(b => { const g = b.genre || 'Unspecified'; byGenre[g] = (byGenre[g]||0) + 1; });
+  const genreEntries = Object.entries(byGenre).sort((a,b)=>b[1]-a[1]);
+  const maxGenre = genreEntries.length ? genreEntries[0][1] : 1;
+
+  // Rating distribution (buckets of 1, 0-10)
+  const buckets = Array(11).fill(0);
+  ratings.forEach(r => { const idx = Math.min(10, Math.max(0, Math.round(r))); buckets[idx]++; });
+  const maxBucket = Math.max(1, ...buckets);
+
+  // Top authors
+  const byAuthor = {};
+  fin.forEach(b => { if (b.author) byAuthor[b.author] = (byAuthor[b.author]||0) + 1; });
+  const topAuthors = Object.entries(byAuthor).sort((a,b)=>b[1]-a[1]).slice(0, 8);
+  const maxAuthor = topAuthors.length ? topAuthors[0][1] : 1;
+
+  const maxYearCount = Math.max(1, ...years.map(y => byYear[y]));
+  const maxMonthCount = Math.max(1, ...byMonth);
+
+  panel.innerHTML = `
+    <div class="stat-grid">
+      <div class="stat-tile"><div class="value">${fmtNum(totalBooks)}</div><div class="label">Books finished</div></div>
+      <div class="stat-tile"><div class="value">${fmtNum(totalPages)}</div><div class="label">Pages read</div></div>
+      <div class="stat-tile"><div class="value">${fmtNum(Math.round(totalHours))}</div><div class="label">Hours read</div></div>
+      <div class="stat-tile"><div class="value">${avgRating != null ? avgRating.toFixed(1) : '—'}</div><div class="label">Avg rating (out of 10)</div></div>
+    </div>
+    <div class="card-grid">
+      <div class="card">
+        <h3>Books per year</h3>
+        <div class="card-sub">Finished books by the year you read them</div>
+        <div class="vbars">
+          ${years.map(y => `
+            <div class="vbar-col" title="${y}: ${byYear[y]} book${byYear[y]===1?'':'s'}">
+              <div class="vbar-count">${byYear[y]}</div>
+              <div class="vbar" style="height:${(byYear[y]/maxYearCount*100).toFixed(1)}%"></div>
+              <div class="vbar-label">${y}</div>
+            </div>`).join('') || '<div class="empty-state">No data yet</div>'}
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h3>Books per month</h3>
+            <div class="card-sub">Reading pace within a year</div>
+          </div>
+          <select id="monthYearSelect">
+            ${years.slice().reverse().map(y => `<option value="${y}" ${y===selectedYear?'selected':''}>${y}</option>`).join('')}
+          </select>
+        </div>
+        <div class="vbars">
+          ${byMonth.map((c,i) => `
+            <div class="vbar-col" title="${MONTH_NAMES[i]} ${selectedYear}: ${c} book${c===1?'':'s'}">
+              <div class="vbar-count">${c || ''}</div>
+              <div class="vbar" style="height:${maxMonthCount ? (c/maxMonthCount*100).toFixed(1) : 0}%"></div>
+              <div class="vbar-label">${MONTH_NAMES[i]}</div>
+            </div>`).join('')}
+        </div>
+      </div>
+      <div class="card">
+        <h3>Genres</h3>
+        <div class="card-sub">${genreEntries.length} genres represented</div>
+        <div class="bars">
+          ${genreEntries.map(([g,c]) => `
+            <div class="bar-row" title="${escapeHtml(g)}: ${c}">
+              <div class="bar-label">${escapeHtml(g)}</div>
+              <div class="bar-track"><div class="bar-fill" style="width:${(c/maxGenre*100).toFixed(1)}%"></div></div>
+              <div class="bar-val">${c}</div>
+            </div>`).join('') || '<div class="empty-state">No data yet</div>'}
+        </div>
+      </div>
+      <div class="card">
+        <h3>Rating distribution</h3>
+        <div class="card-sub">${ratings.length} rated books</div>
+        <div class="vbars">
+          ${buckets.map((c,i) => `
+            <div class="vbar-col" title="Rating ${i}: ${c} book${c===1?'':'s'}">
+              <div class="vbar-count">${c||''}</div>
+              <div class="vbar" style="height:${(c/maxBucket*100).toFixed(1)}%"></div>
+              <div class="vbar-label">${i}</div>
+            </div>`).join('')}
+        </div>
+      </div>
+      <div class="card" style="grid-column: 1 / -1;">
+        <h3>Top authors</h3>
+        <div class="card-sub">By number of books finished</div>
+        <div class="bars">
+          ${topAuthors.map(([a,c]) => `
+            <div class="bar-row" title="${escapeHtml(a)}: ${c}">
+              <div class="bar-label">${escapeHtml(a)}</div>
+              <div class="bar-track"><div class="bar-fill" style="width:${(c/maxAuthor*100).toFixed(1)}%"></div></div>
+              <div class="bar-val">${c}</div>
+            </div>`).join('') || '<div class="empty-state">No data yet</div>'}
+        </div>
+      </div>
+    </div>
+  `;
+
+  const sel = document.getElementById('monthYearSelect');
+  if (sel) sel.addEventListener('change', e => {
+    window.__rt_selectedYear = Number(e.target.value);
+    renderDashboard();
+  });
+}
+
+/* ================= LIBRARY ================= */
+let libSort = { key: 'yearRead', dir: 'desc' };
+let libFilter = { q: '', genre: '', status: '' };
+
+function renderLibrary() {
+  const panel = document.getElementById('panel-library');
+  const genres = Array.from(new Set(state.books.map(b => b.genre).filter(Boolean))).sort();
+
+  panel.innerHTML = `
+    <div class="toolbar">
+      <input type="text" id="libSearch" placeholder="Search title, author, tag, notes…" value="${escapeHtml(libFilter.q)}">
+      <select id="libGenreFilter">
+        <option value="">All genres</option>
+        ${genres.map(g => `<option value="${escapeHtml(g)}" ${libFilter.genre===g?'selected':''}>${escapeHtml(g)}</option>`).join('')}
+      </select>
+      <select id="libStatusFilter">
+        <option value="">All statuses</option>
+        <option value="finished" ${libFilter.status==='finished'?'selected':''}>Finished</option>
+        <option value="reading" ${libFilter.status==='reading'?'selected':''}>Currently Reading</option>
+        <option value="to-read" ${libFilter.status==='to-read'?'selected':''}>To Read</option>
+      </select>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th data-key="title">Title</th>
+            <th data-key="author">Author</th>
+            <th data-key="genre">Genre</th>
+            <th data-key="yearRead">Year</th>
+            <th data-key="rating">Rating</th>
+            <th data-key="pages">Pages</th>
+            <th data-key="status">Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="libTbody"></tbody>
+      </table>
+    </div>
+  `;
+
+  document.getElementById('libSearch').addEventListener('input', e => { libFilter.q = e.target.value; renderLibTbody(); });
+  document.getElementById('libGenreFilter').addEventListener('change', e => { libFilter.genre = e.target.value; renderLibTbody(); });
+  document.getElementById('libStatusFilter').addEventListener('change', e => { libFilter.status = e.target.value; renderLibTbody(); });
+  panel.querySelectorAll('thead th[data-key]').forEach(th => {
+    th.addEventListener('click', () => {
+      const key = th.dataset.key;
+      if (libSort.key === key) libSort.dir = libSort.dir === 'asc' ? 'desc' : 'asc';
+      else { libSort.key = key; libSort.dir = 'asc'; }
+      renderLibTbody();
+    });
+  });
+
+  renderLibTbody();
+}
+
+function renderLibTbody() {
+  const tbody = document.getElementById('libTbody');
+  const q = libFilter.q.trim().toLowerCase();
+  let rows = state.books.filter(b => {
+    if (libFilter.genre && b.genre !== libFilter.genre) return false;
+    if (libFilter.status && b.status !== libFilter.status) return false;
+    if (q) {
+      const hay = [b.title, b.author, b.genre, b.notes, (b.tags||[]).join(' ')].join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  rows.sort((a,b) => {
+    const k = libSort.key;
+    let av = a[k], bv = b[k];
+    if (av == null) av = (typeof bv === 'number') ? -Infinity : '';
+    if (bv == null) bv = (typeof av === 'number') ? -Infinity : '';
+    if (typeof av === 'string') { av = av.toLowerCase(); bv = String(bv).toLowerCase(); }
+    if (av < bv) return libSort.dir === 'asc' ? -1 : 1;
+    if (av > bv) return libSort.dir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state">No books match your filters.</div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = rows.map(b => `
+    <tr>
+      <td>${escapeHtml(b.title)}</td>
+      <td>${escapeHtml(b.author)}</td>
+      <td>${escapeHtml(b.genre)}</td>
+      <td>${b.yearRead || '—'}${b.monthRead ? '/' + String(b.monthRead).padStart(2,'0') : ''}</td>
+      <td>${b.rating != null ? b.rating : '—'}</td>
+      <td>${b.pages != null ? fmtNum(b.pages) : '—'}</td>
+      <td><span class="badge ${b.status}">${b.status === 'to-read' ? 'To Read' : (b.status === 'reading' ? 'Reading' : 'Finished')}</span></td>
+      <td class="row-actions"><button class="btn" data-edit="${b.id}">Edit</button></td>
+    </tr>
+  `).join('');
+
+  tbody.querySelectorAll('button[data-edit]').forEach(btn => {
+    btn.addEventListener('click', () => openBookModal(btn.dataset.edit));
+  });
+}
+
+/* ================= PULITZER ================= */
+let pulFilter = 'all';
+function findMatchingBook(p) {
+  const key = normKey(p.book, p.author);
+  let match = state.books.find(b => b.status === 'finished' && normKey(b.title, b.author) === key);
+  if (match) return match;
+  // fall back to title-only match (author formatting can differ) when unambiguous
+  const titleOnly = state.books.filter(b => b.status === 'finished' && normKey(b.title, '').split('|')[0] === key.split('|')[0]);
+  return titleOnly.length === 1 ? titleOnly[0] : null;
+}
+
+function renderPulitzer() {
+  const panel = document.getElementById('panel-pulitzer');
+  const awarded = state.pulitzer.filter(p => !p.noAward);
+  const matches = new Map(awarded.map(p => [p.id, findMatchingBook(p)]));
+  const readCount = awarded.filter(p => matches.get(p.id)).length;
+  const pct = awarded.length ? Math.round(readCount/awarded.length*100) : 0;
+
+  panel.innerHTML = `
+    <div class="card">
+      <h3>Pulitzer Prize for Fiction — reading challenge</h3>
+      <div class="card-sub">${readCount} of ${awarded.length} winners read (${pct}%) — auto-detected from your Books library</div>
+      <div class="progress-bar"><div style="width:${pct}%"></div></div>
+    </div>
+    <div class="toolbar">
+      <select id="pulFilter">
+        <option value="all">All</option>
+        <option value="read">Read</option>
+        <option value="unread">Unread</option>
+      </select>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Year</th><th>Book</th><th>Author</th><th>Read</th><th>Rating</th></tr>
+        </thead>
+        <tbody id="pulTbody"></tbody>
+      </table>
+    </div>
+  `;
+  document.getElementById('pulFilter').value = pulFilter;
+  document.getElementById('pulFilter').addEventListener('change', e => { pulFilter = e.target.value; renderPulTbody(); });
+  renderPulTbody();
+}
+
+function renderPulTbody() {
+  const tbody = document.getElementById('pulTbody');
+  let rows = state.pulitzer.slice().sort((a,b) => (b.yearWon||0)-(a.yearWon||0));
+  const matchOf = p => p.noAward ? null : findMatchingBook(p);
+  if (pulFilter === 'read') rows = rows.filter(p => matchOf(p));
+  if (pulFilter === 'unread') rows = rows.filter(p => !p.noAward && !matchOf(p));
+
+  tbody.innerHTML = rows.map(p => {
+    const match = matchOf(p);
+    return `
+    <tr class="${p.noAward ? 'no-award' : ''}" title="${match ? 'Matched: ' + escapeHtml(match.title) + (match.yearRead ? ' (' + match.yearRead + ')' : '') : ''}">
+      <td>${p.yearWon || '—'}</td>
+      <td>${escapeHtml(p.book)}</td>
+      <td>${escapeHtml(p.author)}</td>
+      <td>${p.noAward ? '—' : (match ? '<span class="badge finished">Read</span>' : '<span class="badge to-read">Unread</span>')}</td>
+      <td>${p.noAward ? '—' : (match && match.rating != null ? match.rating : '—')}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ================= ADD / EDIT BOOK MODAL ================= */
+let editingId = null;
+function openBookModal(id) {
+  editingId = id || null;
+  const b = id ? state.books.find(x => x.id === id) : null;
+  document.getElementById('bookModalTitle').textContent = b ? 'Edit Book' : 'Add Book';
+  document.getElementById('deleteBookBtn').style.display = b ? 'inline-block' : 'none';
+
+  const monthSel = document.getElementById('f_monthRead');
+  monthSel.innerHTML = '<option value="">—</option>' + MONTH_NAMES.map((m,i) => `<option value="${i+1}">${m}</option>`).join('');
+
+  const genreList = document.getElementById('genreList');
+  const genres = Array.from(new Set(state.books.map(x => x.genre).filter(Boolean))).sort();
+  genreList.innerHTML = genres.map(g => `<option value="${escapeHtml(g)}">`).join('');
+
+  document.getElementById('f_title').value = b ? b.title || '' : '';
+  document.getElementById('f_author').value = b ? b.author || '' : '';
+  document.getElementById('f_genre').value = b ? b.genre || '' : '';
+  document.getElementById('f_status').value = b ? b.status || 'finished' : 'finished';
+  document.getElementById('f_rating').value = b && b.rating != null ? b.rating : '';
+  document.getElementById('f_pages').value = b && b.pages != null ? b.pages : '';
+  document.getElementById('f_yearRead').value = b && b.yearRead != null ? b.yearRead : '';
+  document.getElementById('f_monthRead').value = b && b.monthRead != null ? b.monthRead : '';
+  document.getElementById('f_publishedYear').value = b && b.publishedYear != null ? b.publishedYear : '';
+  document.getElementById('f_tags').value = b && b.tags ? b.tags.join(', ') : '';
+  document.getElementById('f_notes').value = b ? b.notes || '' : '';
+
+  document.getElementById('bookModalBackdrop').classList.add('active');
+  document.getElementById('f_title').focus();
+}
+function closeBookModal() {
+  document.getElementById('bookModalBackdrop').classList.remove('active');
+  editingId = null;
+}
+document.getElementById('addBookBtn').addEventListener('click', () => openBookModal(null));
+document.getElementById('cancelBookBtn').addEventListener('click', closeBookModal);
+document.getElementById('bookModalBackdrop').addEventListener('click', e => { if (e.target.id === 'bookModalBackdrop') closeBookModal(); });
+
+document.getElementById('saveBookBtn').addEventListener('click', () => {
+  const title = document.getElementById('f_title').value.trim();
+  if (!title) { toast('Title is required'); return; }
+  const pages = document.getElementById('f_pages').value ? Number(document.getElementById('f_pages').value) : null;
+  const words = pages ? Math.round(pages * 300) : null;
+  const hoursToRead = words ? Math.round((words/225/60)*100)/100 : null;
+
+  const rec = {
+    id: editingId || uid('b'),
+    title,
+    author: document.getElementById('f_author').value.trim() || null,
+    genre: document.getElementById('f_genre').value.trim() || null,
+    status: document.getElementById('f_status').value,
+    rating: document.getElementById('f_rating').value !== '' ? Number(document.getElementById('f_rating').value) : null,
+    pages,
+    words,
+    hoursToRead,
+    yearRead: document.getElementById('f_yearRead').value !== '' ? Number(document.getElementById('f_yearRead').value) : null,
+    monthRead: document.getElementById('f_monthRead').value !== '' ? Number(document.getElementById('f_monthRead').value) : null,
+    publishedYear: document.getElementById('f_publishedYear').value !== '' ? Number(document.getElementById('f_publishedYear').value) : null,
+    tags: document.getElementById('f_tags').value.split(',').map(s => s.trim()).filter(Boolean),
+    notes: document.getElementById('f_notes').value.trim()
+  };
+
+  if (editingId) {
+    const idx = state.books.findIndex(x => x.id === editingId);
+    // preserve computed word/hour data if user didn't touch pages-derived estimate and original had richer data
+    const existing = state.books[idx];
+    if (existing.pages === rec.pages) { rec.words = existing.words; rec.hoursToRead = existing.hoursToRead; }
+    rec.origin = existing.origin || 'manual';
+    state.books[idx] = rec;
+  } else {
+    rec.origin = 'manual';
+    state.books.push(rec);
+  }
+  saveState();
+  closeBookModal();
+  renderAll();
+  toast('Saved');
+});
+
+document.getElementById('deleteBookBtn').addEventListener('click', () => {
+  if (!editingId) return;
+  if (!confirm('Delete this book from your library?')) return;
+  state.books = state.books.filter(x => x.id !== editingId);
+  saveState();
+  closeBookModal();
+  renderAll();
+  toast('Deleted');
+});
+
+/* ================= EXPORT / IMPORT ================= */
+document.getElementById('exportBtn').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `reading-tracker-backup-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('Backup downloaded');
+});
+document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
+document.getElementById('importFile').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (!data.books || !data.pulitzer) throw new Error('bad shape');
+      if (!confirm('This will replace all current data with the imported backup. Continue?')) return;
+      state = data;
+      saveState();
+      renderAll();
+      toast('Backup imported');
+    } catch (err) {
+      toast('Could not read that file as a valid backup');
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+/* ================= INIT ================= */
+function renderAll() {
+  const fin = finishedBooks();
+  document.getElementById('headerSub').textContent =
+    `${fin.length} books finished · ${state.books.length} total in library`;
+  updateSyncSub();
+  renderDashboard();
+  renderLibrary();
+  renderPulitzer();
+}
+renderAll();
+if (getDriveUrl()) syncFromDrive(true);
+</script>
