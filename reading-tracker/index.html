@@ -1,65 +1,64 @@
 <title>Reading Tracker</title>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%9A%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;0,600;0,700;1,500&display=swap" rel="stylesheet">
 <style>
   :root {
     color-scheme: light;
-    --surface-1:      #fcfcfb;
-    --page-plane:     #f9f9f7;
-    --text-primary:   #0b0b0b;
-    --text-secondary: #52514e;
-    --text-muted:     #898781;
-    --gridline:       #e1e0d9;
-    --baseline:       #c3c2b7;
-    --border:         rgba(11,11,11,0.10);
-    --series-1:       #2a78d6; /* blue */
-    --series-2:       #1baf7a; /* aqua */
-    --series-3:       #eda100; /* yellow */
-    --series-4:       #4a3aa7; /* violet */
-    --series-1-100:   #cde2fb;
-    --series-1-300:   #6da7ec;
-    --good:           #0ca30c;
-    --card-shadow:    0 1px 2px rgba(11,11,11,0.06), 0 1px 8px rgba(11,11,11,0.04);
+    --surface-1:      #fbf6ea;
+    --page-plane:     #f3ead5;
+    --text-primary:   #2b2016;
+    --text-secondary: #6b5d48;
+    --text-muted:     #8a7a5f;
+    --gridline:       #e2d5b7;
+    --baseline:       #c9b98e;
+    --border:         rgba(43,32,22,0.14);
+    --series-1:       #9c3d3d; /* burgundy */
+    --series-2:       #2f7d4f; /* forest green */
+    --series-3:       #b8860b; /* brass / gold */
+    --series-4:       #b5541d; /* terracotta */
+    --good:           #2f7d4f;
+    --card-shadow:    0 1px 2px rgba(43,26,10,0.09), 0 2px 10px rgba(43,26,10,0.07);
+    --font-serif:     'Lora', Georgia, 'Times New Roman', serif;
   }
   @media (prefers-color-scheme: dark) {
     :root:where(:not([data-theme="light"])) {
       color-scheme: dark;
-      --surface-1:      #1a1a19;
-      --page-plane:     #0d0d0d;
-      --text-primary:   #ffffff;
-      --text-secondary: #c3c2b7;
-      --text-muted:     #898781;
-      --gridline:       #2c2c2a;
-      --baseline:       #383835;
-      --border:         rgba(255,255,255,0.10);
-      --series-1:       #3987e5;
-      --series-2:       #199e70;
-      --series-3:       #c98500;
-      --series-4:       #9085e9;
-      --series-1-100:   #184f95;
-      --series-1-300:   #256abf;
-      --good:           #0ca30c;
-      --card-shadow:    0 1px 2px rgba(0,0,0,0.3), 0 1px 8px rgba(0,0,0,0.2);
+      --surface-1:      #241c14;
+      --page-plane:     #19130d;
+      --text-primary:   #f1e6d2;
+      --text-secondary: #c9b998;
+      --text-muted:     #9c8a6a;
+      --gridline:       #392c1f;
+      --baseline:       #4a3c29;
+      --border:         rgba(241,230,210,0.12);
+      --series-1:       #cc5f5c;
+      --series-2:       #45a06c;
+      --series-3:       #ad8a26;
+      --series-4:       #b1502e;
+      --good:           #45a06c;
+      --card-shadow:    0 1px 2px rgba(0,0,0,0.35), 0 2px 10px rgba(0,0,0,0.25);
     }
   }
   :root[data-theme="dark"] {
     color-scheme: dark;
-    --surface-1:      #1a1a19;
-    --page-plane:     #0d0d0d;
-    --text-primary:   #ffffff;
-    --text-secondary: #c3c2b7;
-    --text-muted:     #898781;
-    --gridline:       #2c2c2a;
-    --baseline:       #383835;
-    --border:         rgba(255,255,255,0.10);
-    --series-1:       #3987e5;
-    --series-2:       #199e70;
-    --series-3:       #c98500;
-    --series-4:       #9085e9;
-    --series-1-100:   #184f95;
-    --series-1-300:   #256abf;
-    --good:           #0ca30c;
-    --card-shadow:    0 1px 2px rgba(0,0,0,0.3), 0 1px 8px rgba(0,0,0,0.2);
+    --surface-1:      #241c14;
+    --page-plane:     #19130d;
+    --text-primary:   #f1e6d2;
+    --text-secondary: #c9b998;
+    --text-muted:     #9c8a6a;
+    --gridline:       #392c1f;
+    --baseline:       #4a3c29;
+    --border:         rgba(241,230,210,0.12);
+    --series-1:       #cc5f5c;
+    --series-2:       #45a06c;
+    --series-3:       #ad8a26;
+    --series-4:       #b1502e;
+    --good:           #45a06c;
+    --card-shadow:    0 1px 2px rgba(0,0,0,0.35), 0 2px 10px rgba(0,0,0,0.25);
   }
 
   * { box-sizing: border-box; }
@@ -69,14 +68,21 @@
     color: var(--text-primary);
     font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   }
-  body { min-height: 100vh; }
+  body {
+    min-height: 100vh;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-attachment: fixed;
+  }
+  h1, h2, h3 { font-family: var(--font-serif); }
   .app { max-width: 1180px; margin: 0 auto; padding: 24px 20px 80px; }
 
   header.top {
     display: flex; align-items: center; justify-content: space-between;
     margin-bottom: 20px; gap: 12px; flex-wrap: wrap;
   }
-  header.top h1 { font-size: 22px; margin: 0; font-weight: 700; }
+  header.top h1 { font-size: 24px; margin: 0; font-weight: 700; }
+  header.top .tagline { font-family: var(--font-serif); font-style: italic; color: var(--text-secondary); font-size: 13px; margin-top: 3px; }
   header.top .sub { color: var(--text-secondary); font-size: 13px; margin-top: 2px; }
 
   .icon-btn, .btn {
@@ -95,8 +101,8 @@
     margin-bottom: 20px; overflow-x: auto;
   }
   nav.tabs button {
-    font-family: inherit; background: none; border: none; cursor: pointer;
-    padding: 10px 16px; font-size: 14px; font-weight: 600; color: var(--text-secondary);
+    font-family: var(--font-serif); background: none; border: none; cursor: pointer;
+    padding: 10px 16px; font-size: 15px; font-weight: 600; color: var(--text-secondary);
     border-bottom: 2px solid transparent; white-space: nowrap;
   }
   nav.tabs button.active { color: var(--text-primary); border-bottom-color: var(--series-1); }
@@ -195,13 +201,15 @@
   thead th:hover { color: var(--text-primary); }
   tbody td { padding: 8px 10px; border-bottom: 1px solid var(--gridline); vertical-align: top; }
   tbody tr:hover { background: rgba(127,127,127,0.06); }
+  .gr-link { color: inherit; text-decoration: none; border-bottom: 1px dotted var(--baseline); }
+  .gr-link:hover { color: var(--series-1); border-bottom-color: var(--series-1); }
   .table-wrap { overflow-x: auto; background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; }
   .table-wrap table { min-width: 720px; }
 
   .badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
-  .badge.finished { background: rgba(12,163,12,0.14); color: var(--good); }
-  .badge.reading { background: rgba(42,120,214,0.14); color: var(--series-1); }
-  .badge.to-read { background: rgba(137,135,129,0.16); color: var(--text-secondary); }
+  .badge.finished { background: color-mix(in srgb, var(--good) 16%, transparent); color: var(--good); }
+  .badge.reading { background: color-mix(in srgb, var(--series-3) 18%, transparent); color: var(--series-3); }
+  .badge.to-read { background: color-mix(in srgb, var(--text-muted) 18%, transparent); color: var(--text-secondary); }
 
   .progress-bar { background: var(--gridline); border-radius: 999px; height: 10px; overflow: hidden; margin: 8px 0 4px; }
   .progress-bar > div { background: var(--series-1); height: 100%; border-radius: 999px; transition: width .3s; }
@@ -224,6 +232,7 @@
   <header class="top">
     <div>
       <h1>📚 Reading Tracker</h1>
+      <div class="tagline">a record of pages turned</div>
       <div class="sub" id="headerSub">Loading…</div>
       <div class="sub" id="syncSub" style="margin-top:2px;"></div>
     </div>
@@ -237,9 +246,9 @@
   </header>
 
   <nav class="tabs">
-    <button data-tab="dashboard" class="active">Reading Analysis</button>
-    <button data-tab="library">Library</button>
-    <button data-tab="pulitzer">Pulitzer Challenge</button>
+    <button data-tab="dashboard" class="active">📖 Reading Analysis</button>
+    <button data-tab="library">🔖 Library</button>
+    <button data-tab="pulitzer">🏆 Pulitzer Challenge</button>
   </nav>
 
   <section class="panel active" id="panel-dashboard"></section>
@@ -948,7 +957,7 @@ function renderLibTbody() {
   tbody.innerHTML = rows.map(b => `
     <tr>
       <td>${b.order != null ? b.order : '—'}</td>
-      <td>${escapeHtml(b.title)}</td>
+      <td><a class="gr-link" href="https://www.goodreads.com/search?q=${encodeURIComponent(b.title + (b.author ? ' ' + b.author : ''))}" target="_blank" rel="noopener noreferrer" title="Search this book on Goodreads">${escapeHtml(b.title)}</a></td>
       <td>${escapeHtml(b.author)}</td>
       <td>${escapeHtml(b.genre)}</td>
       <td>${b.yearRead || '—'}${b.monthRead ? '/' + String(b.monthRead).padStart(2,'0') : ''}</td>
