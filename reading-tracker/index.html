@@ -415,9 +415,29 @@ function escapeHtml(s) {
 }
 
 /* ================= DASHBOARD ================= */
+let dashFilter = { yearMin: '', yearMax: '', genre: '', author: '', minRating: '' };
+
+function dashHasActiveFilters() {
+  return !!(dashFilter.yearMin || dashFilter.yearMax || dashFilter.genre || dashFilter.author || dashFilter.minRating);
+}
+function dashApplyFilters(books, ignoreYear) {
+  return books.filter(b => {
+    if (!ignoreYear) {
+      if (dashFilter.yearMin !== '' && (!b.yearRead || b.yearRead < Number(dashFilter.yearMin))) return false;
+      if (dashFilter.yearMax !== '' && (!b.yearRead || b.yearRead > Number(dashFilter.yearMax))) return false;
+    }
+    if (dashFilter.genre && b.genre !== dashFilter.genre) return false;
+    if (dashFilter.author && b.author !== dashFilter.author) return false;
+    if (dashFilter.minRating !== '' && (b.rating == null || b.rating < Number(dashFilter.minRating))) return false;
+    return true;
+  });
+}
+
 function renderDashboard() {
   const panel = document.getElementById('panel-dashboard');
-  const fin = finishedBooks();
+  const allFin = finishedBooks();
+  const fin = dashApplyFilters(allFin, false);
+  const paceBooks = dashApplyFilters(allFin, true);
   const totalBooks = fin.length;
   const totalPages = fin.reduce((s,b) => s + (b.pages||0), 0);
   const totalHours = fin.reduce((s,b) => s + (b.hoursToRead||0), 0);
@@ -455,14 +475,116 @@ function renderDashboard() {
   const maxYearCount = Math.max(1, ...years.map(y => byYear[y]));
   const maxMonthCount = Math.max(1, ...byMonth);
 
+  // Filter option universes (unfiltered, so the dropdowns never shrink)
+  const allYears = Array.from(new Set(allFin.map(b => b.yearRead).filter(Boolean))).sort((a,b)=>a-b);
+  const allGenres = Array.from(new Set(allFin.map(b => b.genre).filter(Boolean))).sort();
+  const allAuthors = Array.from(new Set(allFin.map(b => b.author).filter(Boolean))).sort();
+
+  // Extreme callouts
+  const withPages = fin.filter(b => b.pages != null && b.pages > 0);
+  const longest = withPages.length ? withPages.reduce((a,b) => b.pages > a.pages ? b : a) : null;
+  const shortest = withPages.length ? withPages.reduce((a,b) => b.pages < a.pages ? b : a) : null;
+  const withHours = fin.filter(b => b.hoursToRead != null && b.hoursToRead > 0);
+  const quickest = withHours.length ? withHours.reduce((a,b) => b.hoursToRead < a.hoursToRead ? b : a) : null;
+  const slowest = withHours.length ? withHours.reduce((a,b) => b.hoursToRead > a.hoursToRead ? b : a) : null;
+
+  // Avg rating by genre
+  const genreRatings = {};
+  fin.forEach(b => { if (b.genre && b.rating != null) (genreRatings[b.genre] = genreRatings[b.genre] || []).push(b.rating); });
+  const avgRatingByGenre = Object.entries(genreRatings)
+    .map(([g, arr]) => [g, arr.reduce((a,b)=>a+b,0) / arr.length])
+    .sort((a,b) => b[1]-a[1]);
+
+  // Avg pages per book, by year
+  const pagesByYear = {};
+  years.forEach(y => {
+    const withP = fin.filter(b => b.yearRead === y && b.pages != null);
+    pagesByYear[y] = withP.length ? Math.round(withP.reduce((s,b)=>s+b.pages,0) / withP.length) : 0;
+  });
+  const maxAvgPages = Math.max(1, ...years.map(y => pagesByYear[y]));
+
+  // Reading pace: year-to-date comparison + end-of-year projection (ignores year-range filter)
+  const now = new Date();
+  const curYear = now.getFullYear();
+  const curMonth = now.getMonth() + 1;
+  const dated = paceBooks.filter(b => b.yearRead && b.monthRead);
+  const paceYears = Array.from(new Set(dated.map(b => b.yearRead))).sort((a,b)=>a-b);
+  const toDateCount = {}, toDateWords = {};
+  paceYears.forEach(y => {
+    const subset = dated.filter(b => b.yearRead === y && b.monthRead <= curMonth);
+    toDateCount[y] = subset.length;
+    toDateWords[y] = subset.reduce((s,b) => s + (b.words||0), 0);
+  });
+  const thisYearCount = toDateCount[curYear] || 0;
+  const thisYearWords = toDateWords[curYear] || 0;
+  const lastYearCount = toDateCount[curYear - 1];
+  const paceDelta = lastYearCount != null ? thisYearCount - lastYearCount : null;
+  const projectedBooks = Math.round(thisYearCount / curMonth * 12);
+  const projectedWords = Math.round(thisYearWords / curMonth * 12);
+  const projectedHours = Math.round(projectedWords / 225 / 60);
+  const maxToDate = Math.max(1, ...paceYears.map(y => toDateCount[y]));
+
+  // Pulitzer mini progress (always global, not affected by dashboard filters)
+  const pulAwarded = state.pulitzer.filter(p => !p.noAward);
+  const pulReadCount = pulAwarded.filter(p => findMatchingBook(p)).length;
+  const pulPct = pulAwarded.length ? Math.round(pulReadCount / pulAwarded.length * 100) : 0;
+
   panel.innerHTML = `
+    <div class="toolbar">
+      <select id="dashYearMin"><option value="">Year from</option>${allYears.map(y => `<option value="${y}" ${dashFilter.yearMin===String(y)?'selected':''}>${y}</option>`).join('')}</select>
+      <select id="dashYearMax"><option value="">Year to</option>${allYears.map(y => `<option value="${y}" ${dashFilter.yearMax===String(y)?'selected':''}>${y}</option>`).join('')}</select>
+      <select id="dashGenre"><option value="">All genres</option>${allGenres.map(g => `<option value="${escapeHtml(g)}" ${dashFilter.genre===g?'selected':''}>${escapeHtml(g)}</option>`).join('')}</select>
+      <select id="dashAuthor"><option value="">All authors</option>${allAuthors.map(a => `<option value="${escapeHtml(a)}" ${dashFilter.author===a?'selected':''}>${escapeHtml(a)}</option>`).join('')}</select>
+      <select id="dashMinRating">
+        <option value="">Any rating</option>
+        ${[6,7,8,9,10].map(n => `<option value="${n}" ${dashFilter.minRating===String(n)?'selected':''}>${n}${n<10?'+':' only'}</option>`).join('')}
+      </select>
+      ${dashHasActiveFilters() ? '<button class="btn" id="dashClearFilters">Clear filters</button>' : ''}
+    </div>
     <div class="stat-grid">
       <div class="stat-tile"><div class="value">${fmtNum(totalBooks)}</div><div class="label">Books finished</div></div>
       <div class="stat-tile"><div class="value">${fmtNum(totalPages)}</div><div class="label">Pages read</div></div>
       <div class="stat-tile"><div class="value">${fmtNum(Math.round(totalHours))}</div><div class="label">Hours read</div></div>
       <div class="stat-tile"><div class="value">${avgRating != null ? avgRating.toFixed(1) : '—'}</div><div class="label">Avg rating (out of 10)</div></div>
     </div>
+    <div class="stat-grid">
+      <div class="stat-tile"><div class="value">${longest ? fmtNum(longest.pages) : '—'}</div><div class="label">Longest book${longest ? ' · ' + escapeHtml(longest.title) : ''}</div></div>
+      <div class="stat-tile"><div class="value">${shortest ? fmtNum(shortest.pages) : '—'}</div><div class="label">Shortest book${shortest ? ' · ' + escapeHtml(shortest.title) : ''}</div></div>
+      <div class="stat-tile"><div class="value">${quickest ? quickest.hoursToRead.toFixed(1) + ' hrs' : '—'}</div><div class="label">Quickest read${quickest ? ' · ' + escapeHtml(quickest.title) : ''}</div></div>
+      <div class="stat-tile"><div class="value">${slowest ? slowest.hoursToRead.toFixed(1) + ' hrs' : '—'}</div><div class="label">Longest read${slowest ? ' · ' + escapeHtml(slowest.title) : ''}</div></div>
+    </div>
     <div class="card-grid">
+      <div class="card" style="grid-column: 1 / -1;">
+        <h3>Reading pace</h3>
+        <div class="card-sub">Year-to-date through ${MONTH_NAMES[curMonth-1]}, compared across years</div>
+        <div class="vbars">
+          ${paceYears.map(y => `
+            <div class="vbar-col" title="${y} through ${MONTH_NAMES[curMonth-1]}: ${toDateCount[y]} books">
+              <div class="vbar-count">${toDateCount[y]}</div>
+              <div class="vbar" style="height:${(toDateCount[y]/maxToDate*100).toFixed(1)}%"></div>
+              <div class="vbar-label">${y}</div>
+            </div>`).join('') || '<div class="empty-state">No data yet</div>'}
+        </div>
+        <div style="display:flex; gap:28px; flex-wrap:wrap; margin-top:14px; padding-top:14px; border-top:1px solid var(--gridline);">
+          <div>
+            <div style="font-size:20px;font-weight:700;">${thisYearCount}${paceDelta != null ? ` <span style="font-size:12px;font-weight:600;color:${paceDelta>=0?'var(--good)':'#e34948'};">${paceDelta>=0?'+':''}${paceDelta} vs ${curYear-1}</span>` : ''}</div>
+            <div class="card-sub" style="margin-bottom:0;">Books so far in ${curYear}</div>
+          </div>
+          <div>
+            <div style="font-size:20px;font-weight:700;">~${fmtNum(projectedBooks)}</div>
+            <div class="card-sub" style="margin-bottom:0;">Projected books by Dec 31</div>
+          </div>
+          <div>
+            <div style="font-size:20px;font-weight:700;">~${fmtNum(projectedWords)}</div>
+            <div class="card-sub" style="margin-bottom:0;">Projected words by Dec 31 (~${fmtNum(projectedHours)} hrs)</div>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="grid-column: 1 / -1; cursor:pointer;" id="dashPulitzerLink">
+        <h3>Pulitzer Prize for Fiction</h3>
+        <div class="card-sub">${pulReadCount} of ${pulAwarded.length} winners read (${pulPct}%) — view Pulitzer Challenge tab →</div>
+        <div class="progress-bar"><div style="width:${pulPct}%"></div></div>
+      </div>
       <div class="card">
         <h3>Books per year</h3>
         <div class="card-sub">Finished books by the year you read them</div>
@@ -518,6 +640,30 @@ function renderDashboard() {
             </div>`).join('')}
         </div>
       </div>
+      <div class="card">
+        <h3>Avg rating by genre</h3>
+        <div class="card-sub">Out of 10, genres with at least one rated book</div>
+        <div class="bars">
+          ${avgRatingByGenre.map(([g,avg]) => `
+            <div class="bar-row" title="${escapeHtml(g)}: ${avg.toFixed(1)}">
+              <div class="bar-label">${escapeHtml(g)}</div>
+              <div class="bar-track"><div class="bar-fill" style="width:${(avg/10*100).toFixed(1)}%"></div></div>
+              <div class="bar-val">${avg.toFixed(1)}</div>
+            </div>`).join('') || '<div class="empty-state">No data yet</div>'}
+        </div>
+      </div>
+      <div class="card">
+        <h3>Avg pages per book, by year</h3>
+        <div class="card-sub">Are your books getting longer or shorter?</div>
+        <div class="vbars">
+          ${years.map(y => `
+            <div class="vbar-col" title="${y}: avg ${pagesByYear[y]} pages">
+              <div class="vbar-count">${pagesByYear[y] || ''}</div>
+              <div class="vbar" style="height:${(pagesByYear[y]/maxAvgPages*100).toFixed(1)}%"></div>
+              <div class="vbar-label">${y}</div>
+            </div>`).join('') || '<div class="empty-state">No data yet</div>'}
+        </div>
+      </div>
       <div class="card" style="grid-column: 1 / -1;">
         <h3>Top authors</h3>
         <div class="card-sub">By number of books finished</div>
@@ -532,6 +678,15 @@ function renderDashboard() {
       </div>
     </div>
   `;
+
+  document.getElementById('dashYearMin').addEventListener('change', e => { dashFilter.yearMin = e.target.value; renderDashboard(); });
+  document.getElementById('dashYearMax').addEventListener('change', e => { dashFilter.yearMax = e.target.value; renderDashboard(); });
+  document.getElementById('dashGenre').addEventListener('change', e => { dashFilter.genre = e.target.value; renderDashboard(); });
+  document.getElementById('dashAuthor').addEventListener('change', e => { dashFilter.author = e.target.value; renderDashboard(); });
+  document.getElementById('dashMinRating').addEventListener('change', e => { dashFilter.minRating = e.target.value; renderDashboard(); });
+  const dashClearBtn = document.getElementById('dashClearFilters');
+  if (dashClearBtn) dashClearBtn.addEventListener('click', () => { dashFilter = { yearMin: '', yearMax: '', genre: '', author: '', minRating: '' }; renderDashboard(); });
+  document.getElementById('dashPulitzerLink').addEventListener('click', () => document.querySelector('nav.tabs button[data-tab="pulitzer"]').click());
 
   const sel = document.getElementById('monthYearSelect');
   if (sel) sel.addEventListener('change', e => {
