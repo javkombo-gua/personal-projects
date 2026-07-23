@@ -13,6 +13,9 @@
     --baseline:       #c3c2b7;
     --border:         rgba(11,11,11,0.10);
     --series-1:       #2a78d6; /* blue */
+    --series-2:       #1baf7a; /* aqua */
+    --series-3:       #eda100; /* yellow */
+    --series-4:       #4a3aa7; /* violet */
     --series-1-100:   #cde2fb;
     --series-1-300:   #6da7ec;
     --good:           #0ca30c;
@@ -30,6 +33,9 @@
       --baseline:       #383835;
       --border:         rgba(255,255,255,0.10);
       --series-1:       #3987e5;
+      --series-2:       #199e70;
+      --series-3:       #c98500;
+      --series-4:       #9085e9;
       --series-1-100:   #184f95;
       --series-1-300:   #256abf;
       --good:           #0ca30c;
@@ -47,6 +53,9 @@
     --baseline:       #383835;
     --border:         rgba(255,255,255,0.10);
     --series-1:       #3987e5;
+    --series-2:       #199e70;
+    --series-3:       #c98500;
+    --series-4:       #9085e9;
     --series-1-100:   #184f95;
     --series-1-300:   #256abf;
     --good:           #0ca30c;
@@ -144,13 +153,28 @@
   .bar-row .bar-fill { background: var(--series-1); height: 100%; border-radius: 4px; min-width: 3px; transition: width .3s; }
   .bar-row .bar-val { color: var(--text-primary); font-variant-numeric: tabular-nums; font-weight: 600; }
 
-  .vbars { display: flex; align-items: flex-end; gap: 6px; height: 140px; padding-top: 10px; }
+  .vbars { display: flex; align-items: flex-end; gap: 6px; height: 116px; padding-top: 10px; }
   .vbar-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 4px; min-width: 0; }
   .vbar-col .vbar { width: 100%; max-width: 28px; background: var(--series-1); border-radius: 4px 4px 2px 2px; min-height: 2px; transition: height .3s; }
   .vbar-col .vbar-count { font-size: 10px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
   .vbar-col .vbar-label { font-size: 10px; color: var(--text-secondary); margin-top: 2px; }
   .vbar-col:hover .vbar { filter: brightness(1.15); }
   .vbar-col[title] { cursor: default; }
+
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; color: var(--text-secondary); margin-bottom: 8px; }
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+  .legend-swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; flex-shrink: 0; }
+
+  .grouped-bars { display: flex; align-items: flex-end; gap: 4px; height: 116px; padding-top: 10px; }
+  .group-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; min-width: 0; }
+  .group-bars { display: flex; align-items: flex-end; justify-content: center; gap: 2px; height: 100%; width: 100%; }
+  .group-bar { border-radius: 2px 2px 1px 1px; min-height: 2px; transition: height .3s; }
+  .group-label { font-size: 10px; color: var(--text-secondary); margin-top: 4px; }
+
+  .pace-figure { font-size: 20px; font-weight: 700; }
+  .pace-delta { font-size: 12px; font-weight: 600; }
+  .pace-delta.good { color: var(--good); }
+  .pace-delta.bad { color: #e34948; }
 
   .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; align-items: center; }
   .toolbar input[type=text] {
@@ -488,6 +512,78 @@ function initDualRangeSlider(lowId, highId, fillId, labelId, opts) {
   paint();
 }
 
+const SERIES_COLOR_VARS = ['var(--series-1)', 'var(--series-2)', 'var(--series-3)', 'var(--series-4)'];
+function seriesColorVar(i) { return SERIES_COLOR_VARS[i % SERIES_COLOR_VARS.length]; }
+
+function compactVbarsStyle(n) {
+  const w = Math.min(560, Math.max(140, n * 90));
+  return `max-width:${w}px;margin:0 auto;`;
+}
+
+function renderPaceLineChart(paceYears, monthlyPace, curYear, curMonth, projectedBooksVal) {
+  const W = 640, H = 200, padL = 30, padR = 12, padT = 10, padB = 22;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+
+  const cum = {};
+  paceYears.forEach(y => {
+    let run = 0;
+    cum[y] = (monthlyPace[y] || Array(12).fill(0)).map(c => (run += c));
+  });
+
+  let maxVal = 1;
+  paceYears.forEach(y => { maxVal = Math.max(maxVal, ...cum[y]); });
+  if (paceYears.includes(curYear)) maxVal = Math.max(maxVal, projectedBooksVal);
+  maxVal = Math.ceil(maxVal * 1.15) || 1;
+
+  const xAt = m => padL + (m / 11) * innerW;
+  const yAt = v => padT + innerH - (v / maxVal) * innerH;
+
+  const gridLines = [0, 0.25, 0.5, 0.75, 1].map(f => {
+    const y = padT + innerH * (1 - f);
+    const val = Math.round(maxVal * f);
+    return `<line x1="${padL}" x2="${W-padR}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}" stroke="var(--gridline)" stroke-width="1"/><text x="${padL-6}" y="${(y+3).toFixed(1)}" text-anchor="end" font-size="9" fill="var(--text-muted)">${val}</text>`;
+  }).join('');
+
+  const monthLabels = MONTH_NAMES.map((m, i) => `<text x="${xAt(i).toFixed(1)}" y="${H-6}" text-anchor="middle" font-size="9" fill="var(--text-muted)">${m}</text>`).join('');
+
+  let seriesSvg = '';
+  let legendHtml = '';
+  paceYears.forEach((y, idx) => {
+    const colorVar = seriesColorVar(idx);
+    const arr = cum[y] || Array(12).fill(0);
+    const isCur = Number(y) === curYear;
+    const actualEnd = isCur ? curMonth : 12;
+    const pts = [];
+    let dots = '';
+    for (let m = 0; m < actualEnd; m++) {
+      const px = xAt(m).toFixed(1), py = yAt(arr[m]).toFixed(1);
+      pts.push(`${px},${py}`);
+      dots += `<circle cx="${px}" cy="${py}" r="3" fill="${colorVar}"><title>${y} · ${MONTH_NAMES[m]}: ${arr[m]} book${arr[m]===1?'':'s'} YTD</title></circle>`;
+    }
+    const actualPath = pts.length > 1 ? `<polyline points="${pts.join(' ')}" fill="none" stroke="${colorVar}" stroke-width="2.5"/>` : '';
+
+    let projPath = '';
+    if (isCur && curMonth < 12) {
+      const startVal = arr[curMonth-1] || 0;
+      const endVal = projectedBooksVal;
+      projPath = `<line x1="${xAt(curMonth-1).toFixed(1)}" y1="${yAt(startVal).toFixed(1)}" x2="${xAt(11).toFixed(1)}" y2="${yAt(endVal).toFixed(1)}" stroke="${colorVar}" stroke-width="2" stroke-dasharray="4 4" opacity="0.55"/>
+        <circle cx="${xAt(11).toFixed(1)}" cy="${yAt(endVal).toFixed(1)}" r="3.5" fill="none" stroke="${colorVar}" stroke-width="2" opacity="0.8"><title>${y} projected by Dec 31: ~${Math.round(endVal)} books</title></circle>`;
+    }
+
+    seriesSvg += actualPath + dots + projPath;
+    legendHtml += `<span class="legend-item"><span class="legend-swatch" style="background:${colorVar}"></span>${y}${isCur ? ' (dashed = projected)' : ''}</span>`;
+  });
+
+  return `
+    <div class="legend">${legendHtml}</div>
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%; height:auto; display:block;">
+      ${gridLines}
+      ${monthLabels}
+      ${seriesSvg}
+    </svg>
+  `;
+}
+
 function renderDashboard() {
   const panel = document.getElementById('panel-dashboard');
   const allFin = finishedBooks();
@@ -512,11 +608,12 @@ function renderDashboard() {
   fin.forEach(b => { if (b.yearRead) byYear[b.yearRead] = (byYear[b.yearRead]||0) + 1; });
   const years = Object.keys(byYear).map(Number).sort((a,b)=>a-b);
 
-  // Year selector for monthly chart (default: latest year)
-  const selectedYear = window.__rt_selectedYear || (years.length ? years[years.length-1] : new Date().getFullYear());
-  window.__rt_selectedYear = selectedYear;
-  const byMonth = Array(12).fill(0);
-  fin.forEach(b => { if (b.yearRead === selectedYear && b.monthRead) byMonth[b.monthRead-1]++; });
+  // Books per month, grouped by year (respects all dashboard filters, including year range)
+  const monthlyFin = {};
+  years.forEach(y => { monthlyFin[y] = Array(12).fill(0); });
+  fin.forEach(b => { if (b.yearRead && b.monthRead && monthlyFin[b.yearRead]) monthlyFin[b.yearRead][b.monthRead-1]++; });
+  const maxGroupVal = Math.max(1, ...years.flatMap(y => monthlyFin[y]));
+  const groupBarWidth = Math.max(4, Math.min(14, Math.floor(22 / Math.max(1, years.length))));
 
   // Genre breakdown
   const byGenre = {};
@@ -534,9 +631,9 @@ function renderDashboard() {
   fin.forEach(b => { if (b.author) byAuthor[b.author] = (byAuthor[b.author]||0) + 1; });
   const topAuthors = Object.entries(byAuthor).sort((a,b)=>b[1]-a[1]).slice(0, 8);
   const maxAuthor = topAuthors.length ? topAuthors[0][1] : 1;
+  const distinctAuthors = Object.keys(byAuthor).length;
 
   const maxYearCount = Math.max(1, ...years.map(y => byYear[y]));
-  const maxMonthCount = Math.max(1, ...byMonth);
 
   // Extreme callouts
   const withPages = fin.filter(b => b.pages != null && b.pages > 0);
@@ -545,8 +642,6 @@ function renderDashboard() {
   const withHours = fin.filter(b => b.hoursToRead != null && b.hoursToRead > 0);
   const quickest = withHours.length ? withHours.reduce((a,b) => b.hoursToRead < a.hoursToRead ? b : a) : null;
   const slowest = withHours.length ? withHours.reduce((a,b) => b.hoursToRead > a.hoursToRead ? b : a) : null;
-  const withRatingBooks = fin.filter(b => b.rating != null);
-  const highestRated = withRatingBooks.length ? withRatingBooks.reduce((a,b) => b.rating > a.rating ? b : a) : null;
 
   // Avg rating by genre
   const genreRatings = {};
@@ -569,25 +664,31 @@ function renderDashboard() {
   const curMonth = now.getMonth() + 1;
   const dated = paceBooks.filter(b => b.yearRead && b.monthRead);
   const paceYears = Array.from(new Set(dated.map(b => b.yearRead))).sort((a,b)=>a-b);
-  const toDateCount = {}, toDateWords = {};
+  const monthlyPace = {};
+  paceYears.forEach(y => { monthlyPace[y] = Array(12).fill(0); });
+  dated.forEach(b => { monthlyPace[b.yearRead][b.monthRead-1]++; });
+
+  const toDateCount = {}, toDateWords = {}, toDatePages = {};
   paceYears.forEach(y => {
     const subset = dated.filter(b => b.yearRead === y && b.monthRead <= curMonth);
     toDateCount[y] = subset.length;
     toDateWords[y] = subset.reduce((s,b) => s + (b.words||0), 0);
+    toDatePages[y] = subset.reduce((s,b) => s + (b.pages||0), 0);
   });
   const thisYearCount = toDateCount[curYear] || 0;
   const thisYearWords = toDateWords[curYear] || 0;
+  const thisYearPages = toDatePages[curYear] || 0;
   const lastYearCount = toDateCount[curYear - 1];
   const paceDelta = lastYearCount != null ? thisYearCount - lastYearCount : null;
   const projectedBooks = Math.round(thisYearCount / curMonth * 12);
   const projectedWords = Math.round(thisYearWords / curMonth * 12);
+  const projectedPages = Math.round(thisYearPages / curMonth * 12);
   const projectedHours = Math.round(projectedWords / 225 / 60);
-  const maxToDate = Math.max(1, ...paceYears.map(y => toDateCount[y]));
 
-  // Pulitzer mini progress (always global, not affected by dashboard filters)
-  const pulAwarded = state.pulitzer.filter(p => !p.noAward);
-  const pulReadCount = pulAwarded.filter(p => findMatchingBook(p)).length;
-  const pulPct = pulAwarded.length ? Math.round(pulReadCount / pulAwarded.length * 100) : 0;
+  const lastYearFullWords = paceYears.includes(curYear - 1)
+    ? dated.filter(b => b.yearRead === curYear - 1).reduce((s,b) => s + (b.words||0), 0)
+    : null;
+  const wordsVariance = lastYearFullWords != null ? projectedWords - lastYearFullWords : null;
 
   const hasActiveFilters = dashHasActiveFilters(overallMinYear, overallMaxYear);
   panel.innerHTML = `
@@ -619,7 +720,7 @@ function renderDashboard() {
       <div class="stat-tile"><div class="value">${fmtNum(totalPages)}</div><div class="label">Pages read</div></div>
       <div class="stat-tile"><div class="value">${fmtNum(Math.round(totalHours))}</div><div class="label">Hours read</div></div>
       <div class="stat-tile"><div class="value">${avgRating != null ? avgRating.toFixed(1) : '—'}</div><div class="label">Avg rating (out of 10)</div></div>
-      <div class="stat-tile"><div class="value">${highestRated ? highestRated.rating : '—'}</div><div class="label">Highest rated${highestRated ? ' · ' + escapeHtml(highestRated.title) : ''}</div></div>
+      <div class="stat-tile"><div class="value">${fmtNum(distinctAuthors)}</div><div class="label">Distinct authors read</div></div>
       <div class="stat-tile"><div class="value">${longest ? fmtNum(longest.pages) : '—'}</div><div class="label">Longest book${longest ? ' · ' + escapeHtml(longest.title) : ''}</div></div>
       <div class="stat-tile"><div class="value">${shortest ? fmtNum(shortest.pages) : '—'}</div><div class="label">Shortest book${shortest ? ' · ' + escapeHtml(shortest.title) : ''}</div></div>
       <div class="stat-tile"><div class="value">${quickest ? quickest.hoursToRead.toFixed(1) + ' hrs' : '—'}</div><div class="label">Quickest read${quickest ? ' · ' + escapeHtml(quickest.title) : ''}</div></div>
@@ -628,39 +729,31 @@ function renderDashboard() {
     <div class="card-grid">
       <div class="card" style="grid-column: 1 / -1;">
         <h3>Reading pace</h3>
-        <div class="card-sub">Year-to-date through ${MONTH_NAMES[curMonth-1]}, compared across years</div>
-        <div class="vbars">
-          ${paceYears.map(y => `
-            <div class="vbar-col" title="${y} through ${MONTH_NAMES[curMonth-1]}: ${toDateCount[y]} books">
-              <div class="vbar-count">${toDateCount[y]}</div>
-              <div class="vbar" style="height:${(toDateCount[y]/maxToDate*100).toFixed(1)}%"></div>
-              <div class="vbar-label">${y}</div>
-            </div>`).join('') || '<div class="empty-state">No data yet</div>'}
-        </div>
+        <div class="card-sub">Cumulative books by month — solid = actual, dashed = projected</div>
+        ${paceYears.length ? renderPaceLineChart(paceYears, monthlyPace, curYear, curMonth, projectedBooks) : '<div class="empty-state">No data yet</div>'}
         <div style="display:flex; gap:28px; flex-wrap:wrap; margin-top:14px; padding-top:14px; border-top:1px solid var(--gridline);">
           <div>
-            <div style="font-size:20px;font-weight:700;">${thisYearCount}${paceDelta != null ? ` <span style="font-size:12px;font-weight:600;color:${paceDelta>=0?'var(--good)':'#e34948'};">${paceDelta>=0?'+':''}${paceDelta} vs ${curYear-1}</span>` : ''}</div>
+            <div class="pace-figure">${thisYearCount}${paceDelta != null ? ` <span class="pace-delta ${paceDelta>=0?'good':'bad'}">${paceDelta>=0?'+':''}${paceDelta} vs ${curYear-1}</span>` : ''}</div>
             <div class="card-sub" style="margin-bottom:0;">Books so far in ${curYear}</div>
           </div>
           <div>
-            <div style="font-size:20px;font-weight:700;">~${fmtNum(projectedBooks)}</div>
+            <div class="pace-figure">~${fmtNum(projectedBooks)}</div>
             <div class="card-sub" style="margin-bottom:0;">Projected books by Dec 31</div>
           </div>
           <div>
-            <div style="font-size:20px;font-weight:700;">~${fmtNum(projectedWords)}</div>
+            <div class="pace-figure">~${fmtNum(projectedPages)}</div>
+            <div class="card-sub" style="margin-bottom:0;">Projected pages by Dec 31</div>
+          </div>
+          <div>
+            <div class="pace-figure">~${fmtNum(projectedWords)}${wordsVariance != null ? ` <span class="pace-delta ${wordsVariance>=0?'good':'bad'}">${wordsVariance>=0?'+':''}${fmtNum(wordsVariance)} vs ${curYear-1}</span>` : ''}</div>
             <div class="card-sub" style="margin-bottom:0;">Projected words by Dec 31 (~${fmtNum(projectedHours)} hrs)</div>
           </div>
         </div>
       </div>
-      <div class="card" style="grid-column: 1 / -1; cursor:pointer;" id="dashPulitzerLink">
-        <h3>Pulitzer Prize for Fiction</h3>
-        <div class="card-sub">${pulReadCount} of ${pulAwarded.length} winners read (${pulPct}%) — view Pulitzer Challenge tab →</div>
-        <div class="progress-bar"><div style="width:${pulPct}%"></div></div>
-      </div>
       <div class="card">
         <h3>Books per year</h3>
         <div class="card-sub">Finished books by the year you read them</div>
-        <div class="vbars">
+        <div class="vbars" style="${compactVbarsStyle(years.length)}">
           ${years.map(y => `
             <div class="vbar-col" title="${y}: ${byYear[y]} book${byYear[y]===1?'':'s'}">
               <div class="vbar-count">${byYear[y]}</div>
@@ -670,22 +763,29 @@ function renderDashboard() {
         </div>
       </div>
       <div class="card">
-        <div class="card-head">
-          <div>
-            <h3>Books per month</h3>
-            <div class="card-sub">Reading pace within a year</div>
-          </div>
-          <select id="monthYearSelect">
-            ${years.slice().reverse().map(y => `<option value="${y}" ${y===selectedYear?'selected':''}>${y}</option>`).join('')}
-          </select>
+        <h3>Avg pages per book, by year</h3>
+        <div class="card-sub">Are your books getting longer or shorter?</div>
+        <div class="vbars" style="${compactVbarsStyle(years.length)}">
+          ${years.map(y => `
+            <div class="vbar-col" title="${y}: avg ${pagesByYear[y]} pages">
+              <div class="vbar-count">${pagesByYear[y] || ''}</div>
+              <div class="vbar" style="height:${(pagesByYear[y]/maxAvgPages*100).toFixed(1)}%"></div>
+              <div class="vbar-label">${y}</div>
+            </div>`).join('') || '<div class="empty-state">No data yet</div>'}
         </div>
-        <div class="vbars">
-          ${byMonth.map((c,i) => `
-            <div class="vbar-col" title="${MONTH_NAMES[i]} ${selectedYear}: ${c} book${c===1?'':'s'}">
-              <div class="vbar-count">${c || ''}</div>
-              <div class="vbar" style="height:${maxMonthCount ? (c/maxMonthCount*100).toFixed(1) : 0}%"></div>
-              <div class="vbar-label">${MONTH_NAMES[i]}</div>
-            </div>`).join('')}
+      </div>
+      <div class="card" style="grid-column: 1 / -1;">
+        <h3>Books per month</h3>
+        <div class="card-sub">Monthly volume by year</div>
+        <div class="legend">${years.map((y,i) => `<span class="legend-item"><span class="legend-swatch" style="background:${seriesColorVar(i)}"></span>${y}</span>`).join('')}</div>
+        <div class="grouped-bars">
+          ${MONTH_NAMES.map((mName, mi) => `
+            <div class="group-col">
+              <div class="group-bars">
+                ${years.map((y,i) => `<div class="group-bar" style="width:${groupBarWidth}px; height:${(monthlyFin[y][mi]/maxGroupVal*100).toFixed(1)}%; background:${seriesColorVar(i)};" title="${mName} ${y}: ${monthlyFin[y][mi]} book${monthlyFin[y][mi]===1?'':'s'}"></div>`).join('')}
+              </div>
+              <div class="group-label">${mName}</div>
+            </div>`).join('') || '<div class="empty-state">No data yet</div>'}
         </div>
       </div>
       <div class="card">
@@ -701,18 +801,6 @@ function renderDashboard() {
         </div>
       </div>
       <div class="card">
-        <h3>Rating distribution</h3>
-        <div class="card-sub">${ratings.length} rated books</div>
-        <div class="vbars">
-          ${buckets.map((c,i) => `
-            <div class="vbar-col" title="Rating ${i}: ${c} book${c===1?'':'s'}">
-              <div class="vbar-count">${c||''}</div>
-              <div class="vbar" style="height:${(c/maxBucket*100).toFixed(1)}%"></div>
-              <div class="vbar-label">${i}</div>
-            </div>`).join('')}
-        </div>
-      </div>
-      <div class="card">
         <h3>Avg rating by genre</h3>
         <div class="card-sub">Out of 10, genres with at least one rated book</div>
         <div class="bars">
@@ -724,16 +812,16 @@ function renderDashboard() {
             </div>`).join('') || '<div class="empty-state">No data yet</div>'}
         </div>
       </div>
-      <div class="card">
-        <h3>Avg pages per book, by year</h3>
-        <div class="card-sub">Are your books getting longer or shorter?</div>
+      <div class="card" style="grid-column: 1 / -1;">
+        <h3>Rating distribution</h3>
+        <div class="card-sub">${ratings.length} rated books</div>
         <div class="vbars">
-          ${years.map(y => `
-            <div class="vbar-col" title="${y}: avg ${pagesByYear[y]} pages">
-              <div class="vbar-count">${pagesByYear[y] || ''}</div>
-              <div class="vbar" style="height:${(pagesByYear[y]/maxAvgPages*100).toFixed(1)}%"></div>
-              <div class="vbar-label">${y}</div>
-            </div>`).join('') || '<div class="empty-state">No data yet</div>'}
+          ${buckets.map((c,i) => `
+            <div class="vbar-col" title="Rating ${i}: ${c} book${c===1?'':'s'}">
+              <div class="vbar-count">${c||''}</div>
+              <div class="vbar" style="height:${(c/maxBucket*100).toFixed(1)}%"></div>
+              <div class="vbar-label">${i}</div>
+            </div>`).join('')}
         </div>
       </div>
       <div class="card" style="grid-column: 1 / -1;">
@@ -765,13 +853,6 @@ function renderDashboard() {
   });
   const dashClearBtn = document.getElementById('dashClearFilters');
   if (dashClearBtn) dashClearBtn.addEventListener('click', () => { dashFilter = { yearMin: null, yearMax: null, genre: '', author: '', ratingMin: 0, ratingMax: 10 }; renderDashboard(); });
-  document.getElementById('dashPulitzerLink').addEventListener('click', () => document.querySelector('nav.tabs button[data-tab="pulitzer"]').click());
-
-  const sel = document.getElementById('monthYearSelect');
-  if (sel) sel.addEventListener('change', e => {
-    window.__rt_selectedYear = Number(e.target.value);
-    renderDashboard();
-  });
 }
 
 /* ================= LIBRARY ================= */
