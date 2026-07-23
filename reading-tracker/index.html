@@ -157,30 +157,6 @@
   .badge.reading { background: rgba(42,120,214,0.14); color: var(--series-1); }
   .badge.to-read { background: rgba(137,135,129,0.16); color: var(--text-secondary); }
 
-  .row-actions { display: flex; gap: 6px; }
-  .row-actions button { font-size: 11px; padding: 4px 8px; border-radius: 6px; }
-
-  .modal-backdrop {
-    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
-    align-items: center; justify-content: center; z-index: 50; padding: 20px;
-  }
-  .modal-backdrop.active { display: flex; }
-  .modal {
-    background: var(--surface-1); border-radius: 14px; padding: 22px; width: 100%; max-width: 520px;
-    max-height: 88vh; overflow-y: auto; box-shadow: 0 8px 40px rgba(0,0,0,0.3);
-  }
-  .modal h2 { margin: 0 0 16px; font-size: 17px; }
-  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .form-grid .full { grid-column: 1 / -1; }
-  .form-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary); font-weight: 600; }
-  .form-grid input, .form-grid select, .form-grid textarea {
-    font-family: inherit; font-size: 13px; padding: 8px 10px; border-radius: 8px;
-    border: 1px solid var(--border); background: var(--page-plane); color: var(--text-primary);
-  }
-  .form-grid textarea { resize: vertical; min-height: 50px; }
-  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
-  .modal-actions .danger { color: #e34948; margin-right: auto; }
-
   .progress-bar { background: var(--gridline); border-radius: 999px; height: 10px; overflow: hidden; margin: 8px 0 4px; }
   .progress-bar > div { background: var(--series-1); height: 100%; border-radius: 999px; transition: width .3s; }
 
@@ -211,7 +187,6 @@
       <button class="icon-btn" id="exportBtn">Export backup</button>
       <button class="icon-btn" id="importBtn">Import backup</button>
       <input type="file" id="importFile" accept=".json" style="display:none">
-      <button class="btn primary" id="addBookBtn">+ Add Book</button>
     </div>
   </header>
 
@@ -225,60 +200,7 @@
   <section class="panel" id="panel-library"></section>
   <section class="panel" id="panel-pulitzer"></section>
 
-  <div class="footer-note">Data is stored locally in this browser (localStorage). Use Export backup regularly to keep a copy.</div>
-</div>
-
-<div class="modal-backdrop" id="bookModalBackdrop">
-  <div class="modal">
-    <h2 id="bookModalTitle">Add Book</h2>
-    <div class="form-grid" id="bookForm">
-      <label class="full">Title
-        <input type="text" id="f_title" required>
-      </label>
-      <label>Author
-        <input type="text" id="f_author">
-      </label>
-      <label>Genre
-        <input type="text" id="f_genre" list="genreList">
-        <datalist id="genreList"></datalist>
-      </label>
-      <label>Status
-        <select id="f_status">
-          <option value="finished">Finished</option>
-          <option value="reading">Currently Reading</option>
-          <option value="to-read">To Read</option>
-        </select>
-      </label>
-      <label>Rating (0–10)
-        <input type="number" id="f_rating" min="0" max="10" step="0.5">
-      </label>
-      <label>Pages
-        <input type="number" id="f_pages" min="0" step="1">
-      </label>
-      <label>Year Read
-        <input type="number" id="f_yearRead" min="1900" max="2100" step="1">
-      </label>
-      <label>Month Read
-        <select id="f_monthRead">
-          <option value="">—</option>
-        </select>
-      </label>
-      <label>Published Year
-        <input type="number" id="f_publishedYear" min="1000" max="2100" step="1">
-      </label>
-      <label>Tags (comma separated)
-        <input type="text" id="f_tags">
-      </label>
-      <label class="full">Notes
-        <textarea id="f_notes"></textarea>
-      </label>
-    </div>
-    <div class="modal-actions">
-      <button class="btn danger" id="deleteBookBtn" style="display:none;">Delete</button>
-      <button class="btn" id="cancelBookBtn">Cancel</button>
-      <button class="btn primary" id="saveBookBtn">Save</button>
-    </div>
-  </div>
+  <div class="footer-note">Library data is read-only and comes from your Google Sheet — edit the sheet, then Sync from Drive.</div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -348,7 +270,7 @@ function parseBooksCsvRows(rows) {
   if (headerIdx === -1) throw new Error('Could not find header row (looking for Title/Author columns)');
   const headers = rows[headerIdx].map(h => h.trim());
   const col = name => headers.indexOf(name);
-  const iTitle = col('Title'), iAuthor = col('Author'), iGenre = col('Genre'),
+  const iOrder = col('Order'), iTitle = col('Title'), iAuthor = col('Author'), iGenre = col('Genre'),
         iPublished = col('Published'), iYearRead = col('Year Read'), iMonthRead = col('Month Read'),
         iRead = col('Read'), iRating = col('Rating'), iPages = col('Pages'),
         iWords = col('Words'), iHrs = col('Hrs to Read');
@@ -365,8 +287,9 @@ function parseBooksCsvRows(rows) {
     const monthRaw = iMonthRead >= 0 ? str(r[iMonthRead]) : null;
     const month = monthRaw ? parseInt(monthRaw, 10) : null;
     const readRaw = iRead >= 0 ? (r[iRead] || '').toString().trim().toUpperCase() : '';
-    const status = readRaw === 'TRUE' ? 'finished' : 'to-read';
+    const status = readRaw === 'TRUE' ? 'finished' : (readRaw === '' ? 'reading' : 'to-read');
     out.push({
+      order: iOrder >= 0 ? num(r[iOrder]) : null,
       title,
       author: iAuthor >= 0 ? str(r[iAuthor]) : null,
       genre: iGenre >= 0 ? str(r[iGenre]) : null,
@@ -618,7 +541,7 @@ function renderDashboard() {
 }
 
 /* ================= LIBRARY ================= */
-let libSort = { key: 'yearRead', dir: 'desc' };
+let libSort = { key: 'order', dir: 'desc' };
 let libFilter = { q: '', genre: '', status: '' };
 
 function renderLibrary() {
@@ -643,6 +566,7 @@ function renderLibrary() {
       <table>
         <thead>
           <tr>
+            <th data-key="order">#</th>
             <th data-key="title">Title</th>
             <th data-key="author">Author</th>
             <th data-key="genre">Genre</th>
@@ -650,7 +574,6 @@ function renderLibrary() {
             <th data-key="rating">Rating</th>
             <th data-key="pages">Pages</th>
             <th data-key="status">Status</th>
-            <th></th>
           </tr>
         </thead>
         <tbody id="libTbody"></tbody>
@@ -704,6 +627,7 @@ function renderLibTbody() {
 
   tbody.innerHTML = rows.map(b => `
     <tr>
+      <td>${b.order != null ? b.order : '—'}</td>
       <td>${escapeHtml(b.title)}</td>
       <td>${escapeHtml(b.author)}</td>
       <td>${escapeHtml(b.genre)}</td>
@@ -711,13 +635,8 @@ function renderLibTbody() {
       <td>${b.rating != null ? b.rating : '—'}</td>
       <td>${b.pages != null ? fmtNum(b.pages) : '—'}</td>
       <td><span class="badge ${b.status}">${b.status === 'to-read' ? 'To Read' : (b.status === 'reading' ? 'Reading' : 'Finished')}</span></td>
-      <td class="row-actions"><button class="btn" data-edit="${b.id}">Edit</button></td>
     </tr>
   `).join('');
-
-  tbody.querySelectorAll('button[data-edit]').forEach(btn => {
-    btn.addEventListener('click', () => openBookModal(btn.dataset.edit));
-  });
 }
 
 /* ================= PULITZER ================= */
@@ -784,95 +703,6 @@ function renderPulTbody() {
     </tr>`;
   }).join('');
 }
-
-/* ================= ADD / EDIT BOOK MODAL ================= */
-let editingId = null;
-function openBookModal(id) {
-  editingId = id || null;
-  const b = id ? state.books.find(x => x.id === id) : null;
-  document.getElementById('bookModalTitle').textContent = b ? 'Edit Book' : 'Add Book';
-  document.getElementById('deleteBookBtn').style.display = b ? 'inline-block' : 'none';
-
-  const monthSel = document.getElementById('f_monthRead');
-  monthSel.innerHTML = '<option value="">—</option>' + MONTH_NAMES.map((m,i) => `<option value="${i+1}">${m}</option>`).join('');
-
-  const genreList = document.getElementById('genreList');
-  const genres = Array.from(new Set(state.books.map(x => x.genre).filter(Boolean))).sort();
-  genreList.innerHTML = genres.map(g => `<option value="${escapeHtml(g)}">`).join('');
-
-  document.getElementById('f_title').value = b ? b.title || '' : '';
-  document.getElementById('f_author').value = b ? b.author || '' : '';
-  document.getElementById('f_genre').value = b ? b.genre || '' : '';
-  document.getElementById('f_status').value = b ? b.status || 'finished' : 'finished';
-  document.getElementById('f_rating').value = b && b.rating != null ? b.rating : '';
-  document.getElementById('f_pages').value = b && b.pages != null ? b.pages : '';
-  document.getElementById('f_yearRead').value = b && b.yearRead != null ? b.yearRead : '';
-  document.getElementById('f_monthRead').value = b && b.monthRead != null ? b.monthRead : '';
-  document.getElementById('f_publishedYear').value = b && b.publishedYear != null ? b.publishedYear : '';
-  document.getElementById('f_tags').value = b && b.tags ? b.tags.join(', ') : '';
-  document.getElementById('f_notes').value = b ? b.notes || '' : '';
-
-  document.getElementById('bookModalBackdrop').classList.add('active');
-  document.getElementById('f_title').focus();
-}
-function closeBookModal() {
-  document.getElementById('bookModalBackdrop').classList.remove('active');
-  editingId = null;
-}
-document.getElementById('addBookBtn').addEventListener('click', () => openBookModal(null));
-document.getElementById('cancelBookBtn').addEventListener('click', closeBookModal);
-document.getElementById('bookModalBackdrop').addEventListener('click', e => { if (e.target.id === 'bookModalBackdrop') closeBookModal(); });
-
-document.getElementById('saveBookBtn').addEventListener('click', () => {
-  const title = document.getElementById('f_title').value.trim();
-  if (!title) { toast('Title is required'); return; }
-  const pages = document.getElementById('f_pages').value ? Number(document.getElementById('f_pages').value) : null;
-  const words = pages ? Math.round(pages * 300) : null;
-  const hoursToRead = words ? Math.round((words/225/60)*100)/100 : null;
-
-  const rec = {
-    id: editingId || uid('b'),
-    title,
-    author: document.getElementById('f_author').value.trim() || null,
-    genre: document.getElementById('f_genre').value.trim() || null,
-    status: document.getElementById('f_status').value,
-    rating: document.getElementById('f_rating').value !== '' ? Number(document.getElementById('f_rating').value) : null,
-    pages,
-    words,
-    hoursToRead,
-    yearRead: document.getElementById('f_yearRead').value !== '' ? Number(document.getElementById('f_yearRead').value) : null,
-    monthRead: document.getElementById('f_monthRead').value !== '' ? Number(document.getElementById('f_monthRead').value) : null,
-    publishedYear: document.getElementById('f_publishedYear').value !== '' ? Number(document.getElementById('f_publishedYear').value) : null,
-    tags: document.getElementById('f_tags').value.split(',').map(s => s.trim()).filter(Boolean),
-    notes: document.getElementById('f_notes').value.trim()
-  };
-
-  if (editingId) {
-    const idx = state.books.findIndex(x => x.id === editingId);
-    // preserve computed word/hour data if user didn't touch pages-derived estimate and original had richer data
-    const existing = state.books[idx];
-    if (existing.pages === rec.pages) { rec.words = existing.words; rec.hoursToRead = existing.hoursToRead; }
-    rec.origin = existing.origin || 'manual';
-    state.books[idx] = rec;
-  } else {
-    rec.origin = 'manual';
-    state.books.push(rec);
-  }
-  saveState();
-  closeBookModal();
-  renderAll();
-  toast('Saved');
-});
-
-document.getElementById('deleteBookBtn').addEventListener('click', () => {
-  if (!editingId) return;
-  if (!confirm('Delete this book from your library?')) return;
-  state.books = state.books.filter(x => x.id !== editingId);
-  saveState();
-  closeBookModal();
-  renderAll();
-  toast('Deleted');
-});
 
 /* ================= EXPORT / IMPORT ================= */
 document.getElementById('exportBtn').addEventListener('click', () => {
