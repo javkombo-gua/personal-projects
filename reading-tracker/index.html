@@ -237,7 +237,7 @@
   </header>
 
   <nav class="tabs">
-    <button data-tab="dashboard" class="active">Dashboard</button>
+    <button data-tab="dashboard" class="active">Reading Analysis</button>
     <button data-tab="library">Library</button>
     <button data-tab="pulitzer">Pulitzer Challenge</button>
   </nav>
@@ -515,10 +515,6 @@ function initDualRangeSlider(lowId, highId, fillId, labelId, opts) {
 const SERIES_COLOR_VARS = ['var(--series-1)', 'var(--series-2)', 'var(--series-3)', 'var(--series-4)'];
 function seriesColorVar(i) { return SERIES_COLOR_VARS[i % SERIES_COLOR_VARS.length]; }
 
-function compactVbarsStyle(n) {
-  const w = Math.min(560, Math.max(140, n * 90));
-  return `max-width:${w}px;margin:0 auto;`;
-}
 
 function renderPaceLineChart(paceYears, monthlyPace, curYear, curMonth, projectedBooksVal) {
   const W = 640, H = 200, padL = 30, padR = 12, padT = 10, padB = 22;
@@ -584,6 +580,32 @@ function renderPaceLineChart(paceYears, monthlyPace, curYear, curMonth, projecte
   `;
 }
 
+function renderSimpleLineChart(categories, values, opts) {
+  opts = opts || {};
+  const fmt = opts.valueFormatter || (v => v);
+  const W = 400, H = 150, padL = 34, padR = 16, padT = 26, padB = 22;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+  const n = categories.length;
+  const maxVal = Math.ceil(Math.max(1, ...values) * 1.35) || 1;
+  const xAt = i => n <= 1 ? padL + innerW/2 : padL + (i/(n-1)) * innerW;
+  const yAt = v => padT + innerH - (v/maxVal) * innerH;
+
+  const gridLines = [0, 0.5, 1].map(f => {
+    const y = padT + innerH * (1 - f);
+    const val = Math.round(maxVal * f);
+    return `<line x1="${padL}" x2="${W-padR}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}" stroke="var(--gridline)" stroke-width="1"/><text x="${padL-6}" y="${(y+3).toFixed(1)}" text-anchor="end" font-size="9" fill="var(--text-muted)">${fmt(val)}</text>`;
+  }).join('');
+
+  const catLabels = categories.map((c, i) => `<text x="${xAt(i).toFixed(1)}" y="${H-5}" text-anchor="middle" font-size="10" fill="var(--text-secondary)">${c}</text>`).join('');
+
+  const pts = values.map((v, i) => `${xAt(i).toFixed(1)},${yAt(v).toFixed(1)}`);
+  const path = pts.length > 1 ? `<polyline points="${pts.join(' ')}" fill="none" stroke="var(--series-1)" stroke-width="2.5"/>` : '';
+  const valueLabels = values.map((v, i) => `<text x="${xAt(i).toFixed(1)}" y="${(yAt(v)-9).toFixed(1)}" text-anchor="middle" font-size="10" font-weight="700" fill="var(--text-primary)">${fmt(v)}</text>`).join('');
+  const dots = values.map((v, i) => `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(v).toFixed(1)}" r="3.5" fill="var(--series-1)"><title>${categories[i]}: ${fmt(v)}</title></circle>`).join('');
+
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%; height:auto; display:block;">${gridLines}${path}${dots}${valueLabels}${catLabels}</svg>`;
+}
+
 function renderDashboard() {
   const panel = document.getElementById('panel-dashboard');
   const allFin = finishedBooks();
@@ -633,8 +655,6 @@ function renderDashboard() {
   const maxAuthor = topAuthors.length ? topAuthors[0][1] : 1;
   const distinctAuthors = Object.keys(byAuthor).length;
 
-  const maxYearCount = Math.max(1, ...years.map(y => byYear[y]));
-
   // Extreme callouts
   const withPages = fin.filter(b => b.pages != null && b.pages > 0);
   const longest = withPages.length ? withPages.reduce((a,b) => b.pages > a.pages ? b : a) : null;
@@ -656,8 +676,6 @@ function renderDashboard() {
     const withP = fin.filter(b => b.yearRead === y && b.pages != null);
     pagesByYear[y] = withP.length ? Math.round(withP.reduce((s,b)=>s+b.pages,0) / withP.length) : 0;
   });
-  const maxAvgPages = Math.max(1, ...years.map(y => pagesByYear[y]));
-
   // Reading pace: year-to-date comparison + end-of-year projection (ignores year-range filter)
   const now = new Date();
   const curYear = now.getFullYear();
@@ -753,26 +771,12 @@ function renderDashboard() {
       <div class="card">
         <h3>Books per year</h3>
         <div class="card-sub">Finished books by the year you read them</div>
-        <div class="vbars" style="${compactVbarsStyle(years.length)}">
-          ${years.map(y => `
-            <div class="vbar-col" title="${y}: ${byYear[y]} book${byYear[y]===1?'':'s'}">
-              <div class="vbar-count">${byYear[y]}</div>
-              <div class="vbar" style="height:${(byYear[y]/maxYearCount*100).toFixed(1)}%"></div>
-              <div class="vbar-label">${y}</div>
-            </div>`).join('') || '<div class="empty-state">No data yet</div>'}
-        </div>
+        ${years.length ? renderSimpleLineChart(years, years.map(y => byYear[y])) : '<div class="empty-state">No data yet</div>'}
       </div>
       <div class="card">
         <h3>Avg pages per book, by year</h3>
         <div class="card-sub">Are your books getting longer or shorter?</div>
-        <div class="vbars" style="${compactVbarsStyle(years.length)}">
-          ${years.map(y => `
-            <div class="vbar-col" title="${y}: avg ${pagesByYear[y]} pages">
-              <div class="vbar-count">${pagesByYear[y] || ''}</div>
-              <div class="vbar" style="height:${(pagesByYear[y]/maxAvgPages*100).toFixed(1)}%"></div>
-              <div class="vbar-label">${y}</div>
-            </div>`).join('') || '<div class="empty-state">No data yet</div>'}
-        </div>
+        ${years.length ? renderSimpleLineChart(years, years.map(y => pagesByYear[y])) : '<div class="empty-state">No data yet</div>'}
       </div>
       <div class="card" style="grid-column: 1 / -1;">
         <h3>Books per month</h3>
@@ -887,6 +891,7 @@ function renderLibrary() {
             <th data-key="genre">Genre</th>
             <th data-key="yearRead">Year</th>
             <th data-key="rating">Rating</th>
+            <th data-key="publishedYear">Published</th>
             <th data-key="pages">Pages</th>
             <th data-key="status">Status</th>
           </tr>
@@ -936,7 +941,7 @@ function renderLibTbody() {
   });
 
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state">No books match your filters.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state">No books match your filters.</div></td></tr>`;
     return;
   }
 
@@ -948,6 +953,7 @@ function renderLibTbody() {
       <td>${escapeHtml(b.genre)}</td>
       <td>${b.yearRead || '—'}${b.monthRead ? '/' + String(b.monthRead).padStart(2,'0') : ''}</td>
       <td>${b.rating != null ? b.rating : '—'}</td>
+      <td>${b.publishedYear != null ? b.publishedYear : '—'}</td>
       <td>${b.pages != null ? fmtNum(b.pages) : '—'}</td>
       <td><span class="badge ${b.status}">${b.status === 'to-read' ? 'To Read' : (b.status === 'reading' ? 'Reading' : 'Finished')}</span></td>
     </tr>
